@@ -52,13 +52,16 @@ def run_health_check():
 threading.Thread(target=run_health_check, daemon=True).start()
 
 # ==========================================
-# IPv4 DNS PATCH (Hugging Face fix)
+# TELEGRAM & YOUTUBE IP-PATCH
 # ==========================================
 import socket
 orig_getaddrinfo = socket.getaddrinfo
 def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     if host == "api.telegram.org":
-        family = socket.AF_INET # Faqat IPv4 ulanish
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('149.154.167.220', port))]
+    if "youtube.com" in host or "youtu.be" in host:
+        # YouTube uchun Google IP manzili (Musiqa qidiruvi uchun)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('142.250.185.110', port))]
     return orig_getaddrinfo(host, port, family, type, proto, flags)
 socket.getaddrinfo = patched_getaddrinfo
 
