@@ -51,26 +51,22 @@ def run_health_check():
 # Serverni alohida oqimda (thread) ishga tushiramiz
 threading.Thread(target=run_health_check, daemon=True).start()
 
-# .env faylini script joylashgan joydan yuklashga harakat qiladi
 # ==========================================
-# TARMOQ DIAGNOSTIKASI (Hugging Face uchun)
+# IPv4 DNS PATCH (Hugging Face fix)
 # ==========================================
-def check_network():
-    log("📡 Tarmoqni tekshirish boshlandi...")
-    test_hosts = ["8.8.8.8", "api.telegram.org", "google.com"]
-    for host in test_hosts:
-        try:
-            socket.gethostbyname(host)
-            log(f"✅ {host} muvaffaqiyatli aniqlandi.")
-        except Exception as e:
-            log(f"❌ {host} aniqlanmadi: {e}")
+import socket
+orig_getaddrinfo = socket.getaddrinfo
+def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    if host == "api.telegram.org":
+        family = socket.AF_INET # Faqat IPv4 ulanish
+    return orig_getaddrinfo(host, port, family, type, proto, flags)
+socket.getaddrinfo = patched_getaddrinfo
 
-# Botni ishga tushirishdan oldin tarmoq tayyor bo'lishini kutamiz
-log("⏳ 10 soniya tarmoq barqarorlashuvini kutamiz...")
-time.sleep(10)
-check_network()
+# Xabarlarni darhol chiqarish funksiyasi
+def log(msg):
+    print(msg, flush=True)
 
-# .env faylini script joylashgan joydan yuklashga harakat qiladi
+# .env yuklash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
 if os.path.exists(dotenv_path):
