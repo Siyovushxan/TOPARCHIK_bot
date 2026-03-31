@@ -584,7 +584,10 @@ if __name__ == "__main__":
     log("🤖 Bot polling rejimida ishga tushmoqda...")
     while True:
         try:
-            bot.infinity_polling(timeout=90, long_polling_timeout=40)
+            # Eski ulanishlarni tozalash (409 xatosini oldini olish uchun)
+            bot.remove_webhook()
+            time.sleep(1)
+            bot.infinity_polling(timeout=20, long_polling_timeout=20)
         except Exception as e:
-            log(f"⚠️ Xato: {e}")
+            log(f"🔔 Polling xatosi: {e}")
             time.sleep(10)
