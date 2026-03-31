@@ -52,16 +52,32 @@ def run_health_check():
 threading.Thread(target=run_health_check, daemon=True).start()
 
 # ==========================================
-# TELEGRAM & YOUTUBE IP-PATCH
+# AQLLI DNS-OVER-HTTPS PATCH (Final Fix)
 # ==========================================
 import socket
+import requests
+
+DNS_CACHE = {}
+
+def resolve_via_doh(host):
+    if host in DNS_CACHE: return DNS_CACHE[host]
+    try:
+        # Google DoH API orqali IP-ni olish
+        r = requests.get(f"https://dns.google/resolve?name={host}&type=A", timeout=2)
+        if r.status_code == 200:
+            ip = r.json().get('Answer', [{}])[0].get('data')
+            if ip:
+                DNS_CACHE[host] = ip
+                return ip
+    except: pass
+    return None
+
 orig_getaddrinfo = socket.getaddrinfo
 def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    if host == "api.telegram.org":
-        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('149.154.167.220', port))]
-    if "youtube.com" in host or "youtu.be" in host:
-        # YouTube uchun Google IP manzili (Musiqa qidiruvi uchun)
-        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('142.250.185.110', port))]
+    if host in ["api.telegram.org", "www.youtube.com", "youtube.com"]:
+        ip = resolve_via_doh(host)
+        if ip:
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (ip, port))]
     return orig_getaddrinfo(host, port, family, type, proto, flags)
 socket.getaddrinfo = patched_getaddrinfo
 
