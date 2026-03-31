@@ -13,6 +13,23 @@ from docx import Document
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
+import socket
+
+# ==========================================
+# INTERNETNI KUTISH (Cloud hosting uchun)
+# ==========================================
+def wait_for_internet():
+    print("⏳ Internet bog'lanishi kutilmoqda...")
+    while True:
+        try:
+            # api.telegram.org ni aniqlashga urinib ko'ramiz
+            socket.gethostbyname("api.telegram.org")
+            print("🌐 Internet va DNS bog'landi!")
+            return
+        except Exception:
+            time.sleep(5)
+
+wait_for_internet()
 
 # .env faylini script joylashgan joydan yuklashga harakat qiladi
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -505,4 +522,11 @@ def calls(call):
 
 if __name__ == "__main__":
     print("🤖 Bot ishlamoqda!")
-    bot.infinity_polling()
+    while True:
+        try:
+            # Botni ishga tushiramiz
+            bot.infinity_polling(timeout=60, long_polling_timeout=30)
+        except Exception as e:
+            print(f"⚠️ Polling'da xato: {e}")
+            # Xatolik bo'lsa biroz kutib, qaytadan urinamiz
+            time.sleep(10)
