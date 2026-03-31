@@ -1,0 +1,6 @@
+pyTelegramBotAPI==4.18.0
+google-generativeai
+yt-dlp
+python-dotenv
+python-pptx
+python-docx
