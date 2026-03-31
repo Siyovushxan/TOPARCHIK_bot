@@ -14,20 +14,22 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 
-# .env faylini script joylashgan joydan yuklash
+# .env faylini script joylashgan joydan yuklashga harakat qiladi
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
-load_dotenv(dotenv_path)
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
 
 # ==========================================
-# SOZLAMALAR
+# SOZLAMALAR (Environment Variables)
 # ==========================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 
+# Xatolikni tekshirish
 if not BOT_TOKEN:
-    print("❌ Xato: BOT_TOKEN topilmadi! .env faylini tekshiring.")
+    print("❌ Xato: BOT_TOKEN topilmadi! .env yoki server 'Secrets' bo'limini tekshiring.")
 if not GEMINI_API_KEY:
     print("⚠️ Ogohlantirish: GEMINI_API_KEY topilmadi! Gemini ishlamasligi mumkin.")
 
