@@ -15,6 +15,27 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 import socket
 
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# ==========================================
+# HEALTH CHECK SERVER (Hugging Face uchun)
+# ==========================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_health_check():
+    # Hugging Face 7860 portini talab qiladi
+    server = HTTPServer(('0.0.0.0', 7860), HealthCheckHandler)
+    print("✅ Health check server 7860-portda ishga tushdi")
+    server.serve_forever()
+
+# Serverni alohida oqimda (thread) ishga tushiramiz
+threading.Thread(target=run_health_check, daemon=True).start()
+
 # ==========================================
 # INTERNETNI KUTISH (Cloud hosting uchun)
 # ==========================================
@@ -22,7 +43,6 @@ def wait_for_internet():
     print("⏳ Internet bog'lanishi kutilmoqda...")
     while True:
         try:
-            # api.telegram.org ni aniqlashga urinib ko'ramiz
             socket.gethostbyname("api.telegram.org")
             print("🌐 Internet va DNS bog'landi!")
             return
