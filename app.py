@@ -18,6 +18,14 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import sys
 
+# ==========================================
+# IPv4 NI MAJBURIY QILISH (Cloud DNS fix)
+# ==========================================
+import urllib3.util.connection as f_conn
+def allowed_gai_family():
+    return socket.AF_INET
+f_conn.allowed_gai_family = allowed_gai_family
+
 # Xabarlarni darhol chiqarish funksiyasi
 def log(msg):
     print(msg, flush=True)
