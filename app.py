@@ -44,6 +44,24 @@ def run_health_check():
 threading.Thread(target=run_health_check, daemon=True).start()
 
 # .env faylini script joylashgan joydan yuklashga harakat qiladi
+# ==========================================
+# TARMOQ DIAGNOSTIKASI (Hugging Face uchun)
+# ==========================================
+def check_network():
+    log("📡 Tarmoqni tekshirish boshlandi...")
+    test_hosts = ["8.8.8.8", "api.telegram.org", "google.com"]
+    for host in test_hosts:
+        try:
+            socket.gethostbyname(host)
+            log(f"✅ {host} muvaffaqiyatli aniqlandi.")
+        except Exception as e:
+            log(f"❌ {host} aniqlanmadi: {e}")
+
+# Botni ishga tushirishdan oldin tarmoq tayyor bo'lishini kutamiz
+log("⏳ 10 soniya tarmoq barqarorlashuvini kutamiz...")
+time.sleep(10)
+check_network()
+
 # .env faylini script joylashgan joydan yuklashga harakat qiladi
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
