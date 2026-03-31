@@ -43,37 +43,7 @@ def run_health_check():
 # Serverni alohida oqimda (thread) ishga tushiramiz
 threading.Thread(target=run_health_check, daemon=True).start()
 
-# ==========================================
-# INTERNETNI KUTISH (Cloud hosting uchun)
-# ==========================================
-def wait_for_internet():
-    log("⏳ Internet va DNS bog'lanishi kutilmoqda...")
-    while True:
-        try:
-            socket.gethostbyname("api.telegram.org")
-            log("🌐 Internet va DNS bog'landi!")
-            return
-        except Exception:
-            time.sleep(5)
-
-wait_for_internet()
-
-# ==========================================
-# INTERNETNI KUTISH (Cloud hosting uchun)
-# ==========================================
-def wait_for_internet():
-    print("⏳ Internet bog'lanishi kutilmoqda...")
-    while True:
-        try:
-            # api.telegram.org ni aniqlashga urinib ko'ramiz
-            socket.gethostbyname("api.telegram.org")
-            print("🌐 Internet va DNS bog'landi!")
-            return
-        except Exception:
-            time.sleep(5)
-
-wait_for_internet()
-
+# .env faylini script joylashgan joydan yuklashga harakat qiladi
 # .env faylini script joylashgan joydan yuklashga harakat qiladi
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 dotenv_path = os.path.join(BASE_DIR, '.env')
