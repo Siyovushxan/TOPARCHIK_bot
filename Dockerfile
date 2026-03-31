@@ -19,4 +19,4 @@ COPY . .
 
 # .env fayli yo'qligini tekshirish uchun (Koyeb'da muhit o'zgaruvchilari orqali beriladi)
 # Botni ishga tushirish
-CMD ["python", "bot.py"]
+CMD ["python", "app.py"]
