@@ -14,6 +14,49 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 import socket
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import sys
+
+# Xabarlarni darhol chiqarish funksiyasi
+def log(msg):
+    print(msg, flush=True)
+
+# ==========================================
+# HEALTH CHECK SERVER (Hugging Face talabi)
+# ==========================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is online and healthy!")
+
+def run_health_check():
+    try:
+        # Hugging Face 7860-portni talab qiladi
+        server = HTTPServer(('0.0.0.0', 7860), HealthCheckHandler)
+        log("✅ Health check server 7860-portda ishga tushdi")
+        server.serve_forever()
+    except Exception as e:
+        log(f"❌ Serverda xato: {e}")
+
+# Serverni alohida oqimda (thread) ishga tushiramiz
+threading.Thread(target=run_health_check, daemon=True).start()
+
+# ==========================================
+# INTERNETNI KUTISH (Cloud hosting uchun)
+# ==========================================
+def wait_for_internet():
+    log("⏳ Internet va DNS bog'lanishi kutilmoqda...")
+    while True:
+        try:
+            socket.gethostbyname("api.telegram.org")
+            log("🌐 Internet va DNS bog'landi!")
+            return
+        except Exception:
+            time.sleep(5)
+
+wait_for_internet()
 
 # ==========================================
 # INTERNETNI KUTISH (Cloud hosting uchun)
@@ -521,12 +564,10 @@ def calls(call):
         bot.edit_message_text(resp, call.message.chat.id, call.message.message_id, reply_markup=get_menu_markup(ds["results"], page), parse_mode="HTML")
 
 if __name__ == "__main__":
-    print("🤖 Bot ishlamoqda!")
+    log("🤖 Bot polling rejimida ishga tushmoqda...")
     while True:
         try:
-            # Botni ishga tushiramiz
-            bot.infinity_polling(timeout=60, long_polling_timeout=30)
+            bot.infinity_polling(timeout=90, long_polling_timeout=40)
         except Exception as e:
-            print(f"⚠️ Polling'da xato: {e}")
-            # Xatolik bo'lsa biroz kutib, qaytadan urinamiz
+            log(f"⚠️ Xato: {e}")
             time.sleep(10)
