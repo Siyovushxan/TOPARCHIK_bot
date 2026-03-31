@@ -410,6 +410,12 @@ def download_audio(video_id, chat_id):
         'format': 'bestaudio/best',
         'outtmpl': path_template,
         'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],
+            }
+        },
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
