@@ -1,6 +1,12 @@
-pyTelegramBotAPI==4.18.0
+aiogram
+aiohttp
+google-genai
 google-generativeai
 yt-dlp
 python-dotenv
 python-pptx
 python-docx
+pdf2docx
+python-magic
+js2py
+pyjsparser

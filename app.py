@@ -1,593 +1,304 @@
-import telebot
-from telebot import types
-import yt_dlp
+import asyncio
+import logging
 import os
-import html
-import time
-import json
-import random
-import google.generativeai as genai
-from dotenv import load_dotenv
-from pptx import Presentation
-from docx import Document
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
-import socket
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import sys
+import aiohttp
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile
+from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
-# ==========================================
-# IPv4 NI MAJBURIY QILISH (Cloud DNS fix)
-# ==========================================
-import urllib3.util.connection as f_conn
-def allowed_gai_family():
-    return socket.AF_INET
-f_conn.allowed_gai_family = allowed_gai_family
+import config
+from services.gemini import ask_gemini
+from services.youtube import search_youtube, download_media
+from services.archive import archive_service
+from services.whisper import transcribe_audio
+from services.docs import convert_pdf_to_docx, run_conversion
 
-# Xabarlarni darhol chiqarish funksiyasi
-def log(msg):
-    print(msg, flush=True)
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ==========================================
-# HEALTH CHECK SERVER (Hugging Face talabi)
-# ==========================================
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is online and healthy!")
+# Bot initialization
+bot = Bot(token=config.BOT_TOKEN)
+dp = Dispatcher()
 
-def run_health_check():
-    try:
-        # Hugging Face 7860-portni talab qiladi
-        server = HTTPServer(('0.0.0.0', 7860), HealthCheckHandler)
-        log("✅ Health check server 7860-portda ishga tushdi")
-        server.serve_forever()
-    except Exception as e:
-        log(f"❌ Serverda xato: {e}")
+# --- Keyboards ---
+def main_menu():
+    builder = ReplyKeyboardBuilder()
+    builder.add(KeyboardButton(text="📥 Media"))
+    builder.add(KeyboardButton(text="📄 Word<->Pdf"))
+    builder.add(KeyboardButton(text="🎙 Ovozli Tahlil"))
+    builder.adjust(2)
+    return builder.as_markup(resize_keyboard=True)
 
-# Serverni alohida oqimda (thread) ishga tushiramiz
-threading.Thread(target=run_health_check, daemon=True).start()
+def ad_inline_markup():
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="💎 Hamkorlik", url="https://t.me/erpaiapp"))
+    builder.add(InlineKeyboardButton(text="📊 Batafsil", callback_data="ad_more"))
+    return builder.as_markup()
 
-# ==========================================
-# AQLLI DNS-OVER-HTTPS PATCH (Final Fix)
-# ==========================================
-import socket
-import requests
+# --- Handlers ---
 
-DNS_CACHE = {}
-
-def resolve_via_doh(host):
-    if host in DNS_CACHE: return DNS_CACHE[host]
-    try:
-        # Google DoH API orqali IP-ni olish
-        r = requests.get(f"https://dns.google/resolve?name={host}&type=A", timeout=2)
-        if r.status_code == 200:
-            ip = r.json().get('Answer', [{}])[0].get('data')
-            if ip:
-                DNS_CACHE[host] = ip
-                return ip
-    except: pass
-    return None
-
-orig_getaddrinfo = socket.getaddrinfo
-def patched_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    if host in ["api.telegram.org", "www.youtube.com", "youtube.com"]:
-        ip = resolve_via_doh(host)
-        if ip:
-            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (ip, port))]
-    return orig_getaddrinfo(host, port, family, type, proto, flags)
-socket.getaddrinfo = patched_getaddrinfo
-
-# Xabarlarni darhol chiqarish funksiyasi
-def log(msg):
-    print(msg, flush=True)
-
-# .env yuklash
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(BASE_DIR, '.env')
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-
-# ==========================================
-# SOZLAMALAR (Environment Variables)
-# ==========================================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
-
-# Xatolikni tekshirish
-if not BOT_TOKEN:
-    print("❌ Xato: BOT_TOKEN topilmadi! .env yoki server 'Secrets' bo'limini tekshiring.")
-if not GEMINI_API_KEY:
-    print("⚠️ Ogohlantirish: GEMINI_API_KEY topilmadi! Gemini ishlamasligi mumkin.")
-
-# Gemini AI sozlash
-genai.configure(api_key=GEMINI_API_KEY)
-
-AVAILABLE_MODELS = []
-CURRENT_MODEL_INDEX = 0
-
-def get_available_models_list():
-    """Mavjud barcha mos Gemini modellarini ro'yxatga olish"""
-    global AVAILABLE_MODELS
-    try:
-        print("🔍 Mavjud modellarni tekshirish...")
-        all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        print(f"📋 Sizning API kalitingizda mavjud modellar: {all_models}")
-        
-        # Eng yaxshi va barqaror modellarni tartib bilan qo'yamiz
-        # 1.5 va 2.5 flash versiyalari odatda eng yuqori limitga ega
-        targets = [
-            'gemini-1.5-flash',           # Eng barqaror va yuqori limitli
-            'gemini-2.5-flash',           # Yangi va tezkor
-            'gemini-flash-lite-latest',   # Minimal kechikish
-            'gemini-2.0-flash',           # Juda tez lekin limiti kamroq bo'lishi mumkin
-            'gemini-1.5-pro',             # Pro versiya (kuchliroq lekin sekinroq)
-            'gemini-pro'
-        ]
-        
-        found_models = []
-        for target in targets:
-            match = [m for m in all_models if target == m.split('/')[-1] or target == m]
-            if match:
-                found_models.append(match[0])
-        
-        # Hech qaysi targetga tushmasa, borini kiritamiz
-        if not found_models and all_models:
-            found_models = all_models
-            
-        AVAILABLE_MODELS = found_models
-        print(f"✅ Ishlatish uchun tanlangan modellar: {AVAILABLE_MODELS}")
-        return found_models
-    except Exception as e:
-        print(f"❌ Modellarni olishda xato: {e}")
-        AVAILABLE_MODELS = ['models/gemini-1.5-flash']
-        return AVAILABLE_MODELS
-
-# Tizim yo'riqnomasi
-SYS_INSTR = (
-    "Sizning ismingiz Toparchik AI. Sizni 'Vibe Coder' (taxallusi Hacker) yaratgan. "
-    "Siz juda aqlli, do'stona va professional yordamchisiz. "
-    "Agar kimdir 'Seni kim yaratgan?' deb so'rasa, har doim 'Meni Vibe Coder (Hacker) yaratgan!' deb faxr bilan javob bering."
-)
-
-def get_current_model():
-    """Navbatdagi yoki joriy modelni qaytarish"""
-    global CURRENT_MODEL_INDEX
-    if not AVAILABLE_MODELS:
-        get_available_models_list()
-    
-    idx = CURRENT_MODEL_INDEX % len(AVAILABLE_MODELS)
-    selected = AVAILABLE_MODELS[idx]
-    print(f"🚀 Hozirgi model: {selected}")
-    return genai.GenerativeModel(selected, system_instruction=SYS_INSTR)
-
-# Initial setup
-get_available_models_list()
-
-bot = telebot.TeleBot(BOT_TOKEN)
-
-# ==========================================
-# DOIMIY XOTIRA (PERSISTENCE)
-# ==========================================
-SEARCH_DATA_FILE = os.path.join(BASE_DIR, "user_searches.json")
-
-def load_user_searches():
-    """Fayldan foydalanuvchi qidiruvlarini yuklash"""
-    if os.path.exists(SEARCH_DATA_FILE):
-        try:
-            with open(SEARCH_DATA_FILE, 'r', encoding='utf-8') as f:
-                # chat_id lar JSON'da string bo'lib qoladi, ularni int ga o'tkazamiz
-                data = json.load(f)
-                return {int(k): v for k, v in data.items()}
-        except Exception as e:
-            print(f"❌ Yuklashda xato: {e}")
-            return {}
-    return {}
-
-def save_user_searches():
-    """Qidiruv natijalarini faylga saqlash"""
-    try:
-        with open(SEARCH_DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(user_searches, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"❌ Saqlashda xato: {e}")
-
-user_searches = load_user_searches()  # Startup'da yuklaymiz
-user_states = {}      # chat_id → current_mode ('music', 'ai', 'pptx', 'docx')
-inline_chat = {}      # video_id → user_id saqlash uchun
-
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
-# ==========================================
-# YORDAMCHI FUNKSIYALAR
-# ==========================================
-def format_duration(seconds):
-    try:
-        m, s = divmod(int(seconds), 60)
-        return f"{m}:{s:02d}"
-    except:
-        return "0:02"
-
-def is_gemini_query(query):
-    """Xabar Gemini uchun savol yoki suhbat ekanini aniqlash"""
-    text = (query or "").strip()
-    if not text:
-        return False
-    
-    lowered = text.lower()
-    
-    # Haqorat yoki yomon so'zlar bo'lsa (aniq Gemini muloqoti uchun)
-    insults = ["tentak", "axmoq", "jinni", "ahmoq", "xafa", "salom", "qalesiz", "yaxshimisiz", "yordam ber", "kimsen"]
-    if any(i in lowered for i in insults):
-        return True
-
-    # Agar xabarda musiqa so'rash jumlalari bo'lsa, bu Gemini emas, musiqa qidiruv bo'lishi kerak
-    music_intents = ["qo'shiq", "qoʻshiq", "musiqa", "mp3", "skachat", "yukla", "topib ber", "eshitish", "audio"]
-    if any(m in lowered for m in music_intents):
-        return False
-        
-    # Savol belgisi bo'lsa
-    if "?" in lowered:
-        return True
-        
-    # Savol so'zlari
-    uz_question_prefixes = (
-        "kim ", "nima ", "qaerda ", "qachon ", "qanday ", "qaysi ", "nima uchun ", "necha ", "qayerda ",
-        "hozir ", "bugun ", "qancha ", "eng ", "qanday qilib", "tushuntir", "haqida"
-    )
-    if any(lowered.startswith(p) for p in uz_question_prefixes):
-        return True
-
-    # Agar 4 tadan ko'p so'z bo'lsa va musiqa belgilari bo'lmasa, gap deb hisoblaymiz
-    words = lowered.split()
-    if len(words) >= 4:
-        return True
-        
-    return False
-
-def clean_music_query(query):
-    """Qidiruv so'rovini ortiqcha so'zlardan tozalash"""
-    lowered = query.lower()
-    stopwords = ["menga", "topib ber", "top", "yuklab ber", "yukla", "kerak", "skachat", "audio", "mp3"]
-    cleaned = lowered
-    for word in stopwords:
-        cleaned = cleaned.replace(word, "")
-    return " ".join(cleaned.split()).strip() if cleaned else query
-
-def retry_gemini(func):
-    """Gemini 429 xatosi bo'lganda kutish va boshqa modelga o'tib ko'rish"""
-    def wrapper(*args, **kwargs):
-        global CURRENT_MODEL_INDEX
-        retries = 5  # Urinishlar sonini oshiramiz
-        delay = 2 
-        last_exception = None
-        
-        for i in range(retries):
-            try:
-                # Har safar joriy modelni olamiz
-                curr_model = get_current_model()
-                # Funksiyaga modelni yuklaymiz (ixtiyoriy, agar func ichida ishlatilsa)
-                # Lekin bizning holatda func global 'model'ni ishlatadi, shuni yangilaymiz
-                return func(*args, **kwargs)
-            except Exception as e:
-                last_exception = e
-                err_str = str(e).lower()
-                
-                if ("429" in err_str or "quota" in err_str):
-                    print(f"⚠️ Limit urildi: {AVAILABLE_MODELS[CURRENT_MODEL_INDEX % len(AVAILABLE_MODELS)]}")
-                    # Modelni almashtiramiz
-                    CURRENT_MODEL_INDEX += 1
-                    next_m = AVAILABLE_MODELS[CURRENT_MODEL_INDEX % len(AVAILABLE_MODELS)]
-                    print(f"🔄 Model almashtirildi, navbatdagi: {next_m}")
-                    
-                    if i < retries - 1:
-                        print(f"⏳ {delay} soniya kutilmoqda...")
-                        time.sleep(delay)
-                        delay *= 1.5
-                        continue
-                break
-        raise last_exception
-    return wrapper
-
-@retry_gemini
-def ask_gemini(query):
-    """Gemini AI'dan javob olish"""
-    lowered_query = query.lower()
-    wow_ads = (
-        "\n\n━━━━━━━━━━━━━━━━━━━━\n"
-        "🌟 <b>@toparchik_bot</b> — Sizning sevimli yordamchingiz!\n"
-        "🚀 <i>Do'stlaringizga ham ulashing!</i>\n"
-        "━━━━━━━━━━━━━━━━━━━━"
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer(
+        "👋 **Toparchik AI Universal Bot (v2.0)** ga xush kelibsiz!\n\n"
+        "Men sizga media yuklash, hujjatlarni aylantirish va ovozli xabarlarni tahlil qilishda yordam beraman.",
+        reply_markup=main_menu(),
+        parse_mode="Markdown"
     )
 
-    if any(k in lowered_query for k in ["nima qilaolasan", "sen nima qilaolasan"]):
-        return "🤖 Imkoniyatlarim: Musiqa, Savol-javob, Prezentatsiya va Referat!" + wow_ads
-        
-    system_instruction = "Siz Toparchik botsiz. Qoidalar: Foydalanuvchi tilida muloqot, doimiy reklama qo'shish."
-    full_prompt = f"{system_instruction}\n\nFoydalanuvchi: {query}"
-    
-    # Modelni yangilab turish uchun generate_content'ni shu funksiya ichidagidan olamiz
-    m = get_current_model()
-    response = m.generate_content(full_prompt)
-    
-    if response and response.text:
-        return response.text.replace('*', '').replace('_', '').replace('`', '').strip() + wow_ads
-    return "😔 Javob topilmadi."
-
-@retry_gemini
-def generate_presentation(topic):
-    """WOW dizayndagi prezentatsiya"""
-    prompt = (
-        f"Mavzu: {topic}. 8 ta slaydli JSON qaytaring: [{{\"title\": \"...\", \"content\": \"...\", \"type\": \"...\"}}, ...]. "
-        "Slaydlar: 1x intro, 6x content, 1x conclusion."
+@dp.message(F.text.in_({"Musiqa qidirish", "AI savol-javob", "PPT yaratish", "Word yaratish", "Asosiy menyu", "📄 Hujjatlar"}))
+async def old_menu_handler(message: types.Message):
+    await message.answer(
+        "ℹ️ **Bot yangilandi!**\n\n"
+        "Iltimos, yangi menyuni ishga tushirish uchun /start ni bosing.",
+        reply_markup=types.ReplyKeyboardRemove()
     )
-    m = get_current_model()
-    response = m.generate_content(prompt)
-    text = response.text.strip()
-    start = text.find('[')
-    end = text.rfind(']') + 1
-    if start != -1 and end != 0:
-        slides_data = json.loads(text[start:end])[:8]
-    else:
-        raise ValueError("JSON topilmadi")
-    
-    prs = Presentation()
-    style = random.choice([
-        {"bg": (255, 255, 255), "acc": (0, 120, 215), "name": "Modern Blue"},
-        {"bg": (30, 30, 30), "acc": (255, 180, 0), "name": "Dark Gold"}
-    ])
-    
-    for i, s in enumerate(slides_data):
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        slide.background.fill.solid()
-        slide.background.fill.fore_color.rgb = RGBColor(*style["bg"])
-        
-        # Simple Split Layout
-        is_left = (i % 2 == 0)
-        rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0 if is_left else Inches(6.5), 0, Inches(3.5), Inches(7.5))
-        rect.fill.solid()
-        rect.fill.fore_color.rgb = RGBColor(*style["acc"])
-        rect.line.fill.background()
 
-        title_box = slide.shapes.add_textbox(Inches(0.7) if not is_left else Inches(4), Inches(1), Inches(5), Inches(1))
-        title_box.text_frame.text = s.get('title', '').upper()
-        title_box.text_frame.paragraphs[0].font.bold = True
-        title_box.text_frame.paragraphs[0].font.size = Pt(28)
-        
-        content_box = slide.shapes.add_textbox(Inches(0.7) if not is_left else Inches(4), Inches(2.2), Inches(5.5), Inches(4))
-        content_box.text_frame.word_wrap = True
-        for line in s.get('content', '').split('\n'):
-            if line.strip():
-                p = content_box.text_frame.add_paragraph()
-                p.text = f"● {line.strip()}"
-                p.font.size = Pt(18)
-    
-    filename = f"pptx_{int(time.time())}.pptx"
-    path = os.path.join(DOWNLOAD_DIR, filename)
-    prs.save(path)
-    return path
+@dp.message(F.text == "📥 Media")
+async def media_menu(message: types.Message):
+    await message.answer("Siz ijtimoiy tarmoqlardan (YT, TT, IG) video yoki musiqa yuklab olishingiz mumkin. Shunchaki link yoki nomini yozing!")
 
-@retry_gemini
-def generate_word_doc(topic):
-    """Word hujjat yaratish"""
-    prompt = f"Mavzu: {topic}. Word uchun JSON: [{{\"heading\": \"...\", \"text\": \"...\"}}, ...]"
-    m = get_current_model()
-    response = m.generate_content(prompt)
-    text = response.text.strip()
-    start = text.find('[')
-    end = text.rfind(']') + 1
-    if start != -1 and end != 0:
-        doc_data = json.loads(text[start:end])
-    else:
-        raise ValueError("JSON topilmadi")
-    
-    doc = Document()
-    doc.add_heading(topic, 0)
-    for d in doc_data:
-        doc.add_heading(d.get('heading', ''), level=1)
-        doc.add_paragraph(d.get('text', ''))
-    path = os.path.join(DOWNLOAD_DIR, f"doc_{int(time.time())}.docx")
-    doc.save(path)
-    return path
+@dp.message(F.text == "📄 Word<->Pdf")
+async def docs_menu(message: types.Message):
+    await message.answer("PDF fayllarni Word'ga va Word fayllarni PDF ga aylantirishim mumkin. Faylni yuboring!")
 
-def search_youtube(query):
-    """40 ta natija qidirish (4 sahifa uchun)"""
-    ydl_opts = {'format': 'bestaudio/best', 'quiet': True, 'extract_flat': True, 'default_search': 'ytsearch', 'noplaylist': True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            # 40 ta natija (har sahifada 10 tadan)
-            return [e for e in ydl.extract_info(f"ytsearch40:{query}", download=False).get('entries', []) if e]
-        except: return []
+@dp.message(F.text == "🎙 Ovozli Tahlil")
+async def voice_menu(message: types.Message):
+    await message.answer("Ovozli xabar yuboring, men uni matnga aylantirib, asosiylarini tahlil qilib beraman!")
 
-def download_audio(video_id, chat_id):
-    """FFmpeg yordamida eng sifatli MP3 yuklash"""
-    path_template = os.path.join(DOWNLOAD_DIR, f"{chat_id}_{video_id}")
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': path_template,
-        'quiet': True,
-        'no_warnings': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android'],
-            }
-        },
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=True)
-            # yt-dlp mp3 qo'shimchasini o'zi qo'shadi
-            final_path = f"{path_template}.mp3"
-            if not os.path.exists(final_path):
-                # Agar kutilmaganda mp3 bo'lmasa, bor faylni topamiz
-                possible_files = [f for f in os.listdir(DOWNLOAD_DIR) if f.startswith(f"{chat_id}_{video_id}")]
-                if possible_files:
-                    final_path = os.path.join(DOWNLOAD_DIR, possible_files[0])
-            return final_path, info
-        except Exception as e:
-            print(f"❌ Yuklab olishda xato: {e}")
-            raise e
+# --- Universal Input Handler ---
 
-def get_main_menu():
-    """Asosiy menyu tugmalarini yaratish"""
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    item1 = types.KeyboardButton("🎵 Musiqa qidirish")
-    item2 = types.KeyboardButton("🤖 AI Savol-javob")
-    item3 = types.KeyboardButton("📊 Prezentatsiya yaratish")
-    item4 = types.KeyboardButton("📄 Word hujjat tayyorlash")
-    item5 = types.KeyboardButton("🏠 Asosiy menyu")
-    markup.add(item1, item2, item3, item4)
-    markup.row(item5)
-    return markup
-
-def get_menu_markup(entries, page=0):
-    markup = types.InlineKeyboardMarkup(row_width=5)
-    start = page * 10
-    current_list = entries[start:start+10]
+@dp.message(F.voice | F.audio)
+async def handle_voice(message: types.Message):
+    wait_msg = await message.answer("⏳ Ovozli xabar tahlil qilinmoqda...")
     
-    # Raqamli tugmalar (tanlash uchun)
-    btns = []
-    for i, _ in enumerate(current_list):
-        btns.append(types.InlineKeyboardButton(str(i+1), callback_data=f"download_{current_list[i]['id']}"))
-    markup.add(*btns)
+    file_id = message.voice.file_id if message.voice else message.audio.file_id
+    file = await bot.get_file(file_id)
+    file_path = f"downloads/{file_id}.oga"
+    await bot.download_file(file.file_path, file_path)
     
-    # Navigatsiya tugmalari (Sahifalar)
-    nav = []
-    if page > 0:
-        nav.append(types.InlineKeyboardButton("⬅️ Oldingi", callback_data=f"nav_{page-1}"))
+    # Transcription
+    transcript = await transcribe_audio(file_path)
+    # AI Summary
+    summary = await ask_gemini(f"Ushbu matnni qisqacha tahlil qilib, eng muhim tezislarni ajrat: {transcript}")
     
-    nav.append(types.InlineKeyboardButton("❌ Yopish", callback_data="close"))
+    final_text = f"📝 **Matn:**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
     
-    if (page + 1) * 10 < len(entries):
-        nav.append(types.InlineKeyboardButton("Keyingi ➡️", callback_data=f"nav_{page+1}"))
-    
-    markup.row(*nav)
-    return markup
-
-@bot.message_handler(commands=['start', 'help'])
-def hi(m):
-    user_states[m.chat.id] = None
-    text = (
-        "👋 <b>Assalomu alaykum! Toparchik AI botiga xush kelibsiz!</b>\n\n"
-        "Men sizga musiqa qidirishda, AI yordamida savollarga javob berishda va "
-        "professional hujjatlar yaratishda yordam beraman.\n\n"
-        "👇 <b>Quyidagi imkoniyatlardan birini tanlang:</b>"
+    # WOW Ad
+    ad_text = (
+        "\n\n---\n"
+        "✨ **Reklama:**\n"
+        "🚀 Bu yerda sizning reklamangiz bo'lishi mumkin! \n"
+        "Yuzlab foydalanuvchilarga biznesingizni ko'rsatmoqchimisiz? Biz bilan bog'laning! 💎"
     )
-    bot.send_message(m.chat.id, text, reply_markup=get_main_menu(), parse_mode="HTML")
-
-@bot.message_handler(func=lambda m: True)
-def handle_text(message):
-    chat_id = message.chat.id
-    query = message.text.strip()
     
-    # Menyu tugmalarini tekshirish
-    if query == "🎵 Musiqa qidirish":
-        user_states[chat_id] = 'music'
-        return bot.send_message(chat_id, "🎵 <b>Musiqa nomini yozing:</b>", parse_mode="HTML")
-    elif query == "🤖 AI Savol-javob":
-        user_states[chat_id] = 'ai'
-        return bot.send_message(chat_id, "🤖 <b>Istalgan savolingizni bering:</b>", parse_mode="HTML")
-    elif query == "📊 Prezentatsiya yaratish":
-        user_states[chat_id] = 'pptx'
-        return bot.send_message(chat_id, "📊 <b>Prezentatsiya mavzusini yoki rejasini yozing:</b>", parse_mode="HTML")
-    elif query == "📄 Word hujjat tayyorlash":
-        user_states[chat_id] = 'docx'
-        return bot.send_message(chat_id, "📄 <b>Hujjat (insho, referat) mavzusini yozing:</b>", parse_mode="HTML")
-    elif query == "🏠 Asosiy menyu":
-        user_states[chat_id] = None
-        return bot.send_message(chat_id, "🏡 <b>Asosiy menyuga qaytdik. Bironta xizmatni tanlang:</b>", reply_markup=get_main_menu(), parse_mode="HTML")
-
-    # Joriy holatni (mode) aniqlash
-    mode = user_states.get(chat_id)
+    await wait_msg.edit_text(final_text + ad_text, reply_markup=ad_inline_markup(), parse_mode="Markdown")
     
-    if mode == 'pptx' or mode == 'docx':
-        waiting_text = "📊 <b>Prezentatsiya slaydlari yaratilmoqda...</b>" if mode == 'pptx' else "✍️ <b>Referat/Hujjat tayyorlanmoqda...</b>"
-        wait = bot.reply_to(message, f"⏳ {waiting_text}", parse_mode="HTML")
-        try:
-            path = generate_presentation(query) if mode == 'pptx' else generate_word_doc(query)
-            with open(path, 'rb') as f:
-                bot.send_document(message.chat.id, f)
-            os.remove(path)
-        except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                bot.send_message(message.chat.id, "😔 <b>Limit tugadi!</b> 1 daqiqa kuting.")
-            else: bot.send_message(message.chat.id, "😔 Xatolik yuz berdi.")
-        finally: 
-            try: bot.delete_message(message.chat.id, wait.message_id)
-            except: pass
-        return
+    # Cleanup
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
-    if mode == 'ai':
-        wait = bot.reply_to(message, "🤖 <b>Gemini o'ylamoqda...</b>", parse_mode="HTML")
-        try:
-            bot.send_message(message.chat.id, ask_gemini(query), parse_mode="HTML")
-        except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                bot.send_message(message.chat.id, "😔 <b>AI Limiti tugadi!</b>")
-            else: bot.send_message(message.chat.id, "😔 Xatolik.")
-        finally: 
-            try: bot.delete_message(message.chat.id, wait.message_id)
-            except: pass
-        return
-
-    if mode == 'music' or not mode:
-        wait = bot.reply_to(message, f"🔍 <b>Qidirilmoqda:</b> {query}...", parse_mode="HTML")
-        results = search_youtube(query)
-        try: bot.delete_message(message.chat.id, wait.message_id)
-        except: pass
-        if not results: return bot.send_message(message.chat.id, "😕 Topilmadi.")
+@dp.message(F.document)
+async def handle_document(message: types.Message):
+    file_name = message.document.file_name.lower() if message.document.file_name else "document"
+    
+    if file_name.endswith('.pdf'):
+        wait_msg = await message.answer("⏳ PDF Word'ga aylantirilmoqda...")
+        file_id = message.document.file_id
+        file = await bot.get_file(file_id)
+        input_path = f"downloads/{message.document.file_name}"
+        await bot.download_file(file.file_path, input_path)
         
-        # Natijalarni saqlash
-        user_searches[message.chat.id] = {"results": results, "query": query}
-        save_user_searches() # Faylga yozish
-        
-        resp = f"🔍 <b>Natijalar:</b> {query}\n\n"
-        for i, e in enumerate(results[:10], 1):
-            resp += f"{i}. {e.get('title', '')[:40]} [{format_duration(e.get('duration'))}]\n"
-        bot.send_message(message.chat.id, resp, reply_markup=get_menu_markup(results), parse_mode="HTML")
-
-@bot.callback_query_handler(func=lambda c: True)
-def calls(call):
-    if call.data == "close": bot.delete_message(call.message.chat.id, call.message.message_id)
-    elif call.data.startswith("download_"):
-        vid = call.data.split("_")[1]
-        bot.answer_callback_query(call.id, "📥 Musiqa tayyorlanmoqda...")
-        wait = bot.send_message(call.message.chat.id, "🎵 <b>Fayl yuklab olinmoqda va konvertatsiya qilinmoqda...</b>", parse_mode="HTML")
         try:
-            path, info = download_audio(vid, call.message.chat.id)
-            with open(path, 'rb') as f:
-                bot.send_audio(call.message.chat.id, f, title=info.get('title'))
-            os.remove(path)
-        except: bot.send_message(call.message.chat.id, "❌ Xato.")
+            output_path = await run_conversion(convert_pdf_to_docx, input_path)
+            doc_file = FSInputFile(output_path)
+            await message.answer_document(doc_file, caption="✅ @toparchik_bot orqali konvertatsiya qilindi!")
+        except Exception as exc:
+            await message.answer(f"❌ Xatolik yuz berdi: {exc}")
         finally:
-            try: bot.delete_message(call.message.chat.id, wait.message_id)
-            except: pass
-    elif call.data.startswith("nav_"):
-        page = int(call.data.split("_")[1])
-        ds = user_searches.get(call.message.chat.id)
-        if not ds: return bot.answer_callback_query(call.id, "😕 Qidiruv muddati o'tgan. Iltimos, qaytadan qidiring.")
-        resp = f"🔍 <b>Natijalar:</b> {ds['query']} ({page+1}-bet)\n\n"
-        for i, e in enumerate(ds["results"][page*10:(page+1)*10], 1):
-            resp += f"{page*10+i}. {e.get('title', '')[:40]}\n"
-        bot.edit_message_text(resp, call.message.chat.id, call.message.message_id, reply_markup=get_menu_markup(ds["results"], page), parse_mode="HTML")
+            if os.path.exists(input_path): os.remove(input_path)
+            if 'output_path' in locals() and os.path.exists(output_path): 
+                try: os.remove(output_path) 
+                except: pass
+            await wait_msg.delete()
+            
+    elif file_name.endswith('.docx') or file_name.endswith('.doc'):
+        wait_msg = await message.answer("⏳ Word PDF'ga aylantirilmoqda...")
+        file_id = message.document.file_id
+        file = await bot.get_file(file_id)
+        input_path = f"downloads/{message.document.file_name}"
+        await bot.download_file(file.file_path, input_path)
+        
+        try:
+            from services.docs import convert_docx_to_pdf
+            output_path = await run_conversion(convert_docx_to_pdf, input_path)
+            pdf_file = FSInputFile(output_path)
+            await message.answer_document(pdf_file, caption="✅ @toparchik_bot orqali konvertatsiya qilindi!")
+        except Exception as exc:
+            await message.answer(f"❌ Xatolik yuz berdi. Word'dan PDF ga o'girish tizimi kompyuterga Word dasturi o'rnatilgan bo'lishini talab qiladi.\n\nXato: {exc}")
+        finally:
+            if os.path.exists(input_path): os.remove(input_path)
+            if 'output_path' in locals() and os.path.exists(output_path): 
+                try: os.remove(output_path) 
+                except: pass
+            await wait_msg.delete()
+            
+    else:
+        await message.answer("🛑 Faqat PDF yoki Word (.doc, .docx) fayllarni yuboring.")
+
+@dp.message()
+async def handle_text(message: types.Message):
+    # Detect if it's a link or a search query
+    text = message.text
+    if "youtube.com" in text or "youtu.be" in text or "tiktok.com" in text or "instagram.com" in text:
+        wait_msg = await message.answer("⏳ Media yuklab olinmoqda...")
+        try:
+            info, file_path = await download_media(text, message.chat.id)
+            media_file = FSInputFile(file_path)
+            await message.answer_audio(media_file, title=info.get('title', 'Media'), caption="✅ @toparchik_bot orqali yuklandi")
+            
+            # Cache to Archive
+            archive_msg = await bot.send_audio(chat_id=config.ARCHIVE_CHANNEL, audio=media_file, caption=f"#musiqa {info.get('title', '')}")
+            archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+            
+        except Exception as exc:
+            await message.answer(f"❌ Media yuklashda xato: {exc}")
+        finally:
+            if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
+            await wait_msg.delete()
+    else:
+        # Search Archive Cache
+        results = archive_service.search_cache(text)
+        
+        # Search YouTube to fill the rest
+        if len(results) < 10:
+            try:
+                yt_results = await search_youtube(text, max_results=10)
+            except Exception as e:
+                logger.error(f"YouTube Search failed: {e}")
+                yt_results = []
+                
+            seen_ids = set([res['id'] for res in results])
+            for yt_res in yt_results:
+                if yt_res['id'] not in seen_ids:
+                    results.append(yt_res)
+                    seen_ids.add(yt_res['id'])
+
+        if results:
+            def format_duration(seconds):
+                if not seconds: return ""
+                mins, secs = divmod(int(seconds), 60)
+                return f"{mins}:{secs:02d}"
+                
+            response_text = f"🔍 {text}\n\n"
+            builder = InlineKeyboardBuilder()
+            
+            for i, res in enumerate(results[:10], 1):
+                duration = format_duration(res.get('duration', 0))
+                response_text += f"{i}. {res['title']} {duration}\n"
+                builder.add(InlineKeyboardButton(text=str(i), callback_data=f"dl_{res['id']}"))
+                
+            # Add navigation buttons
+            builder.add(InlineKeyboardButton(text="⬅️", callback_data="nav_prev"))
+            builder.add(InlineKeyboardButton(text="❌", callback_data="nav_close"))
+            builder.add(InlineKeyboardButton(text="➡️", callback_data="nav_next"))
+            
+            builder.adjust(5, 5, 3)
+            await message.answer(response_text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        else:
+            # AI Chat fallback
+            response = await ask_gemini(text)
+            await message.answer(response)
+
+# --- Download Callback ---
+@dp.callback_query(F.data.startswith("dl_"))
+async def process_download(callback: types.CallbackQuery):
+    video_id = callback.data.split("_", 1)[1]
+    wait_msg = await callback.message.answer("⏳ Audio yuklab olinmoqda...")
+    await callback.answer()
+
+    # Check cache first
+    cached_file_id = archive_service.get_cached_file_id(video_id)
+    
+    caption_text = "❤️ @toparchik_bot orqali istagan musiqangizni tez va oson toping!🚀"
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="👉 Guruhga Qo'shish ↗️", url="https://t.me/toparchik_bot?startgroup=true"))
+    reply_markup = builder.as_markup()
+
+    if cached_file_id:
+        await bot.send_audio(callback.message.chat.id, audio=cached_file_id, caption=caption_text, reply_markup=reply_markup)
+        await wait_msg.delete()
+        return
+    
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    try:
+        info, file_path = await download_media(url, callback.message.chat.id, audio_only=True)
+        media_file = FSInputFile(file_path)
+        
+        sent_msg = await bot.send_audio(callback.message.chat.id, media_file, title=info.get('title', 'Audio'), caption=caption_text, reply_markup=reply_markup)
+        
+        # Cache to Archive
+        if config.ARCHIVE_CHANNEL:
+            try:
+                archive_msg = await bot.send_audio(chat_id=config.ARCHIVE_CHANNEL, audio=sent_msg.audio.file_id, caption=f"#musiqa {info.get('title', '')}")
+                archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+            except Exception as e:
+                logger.error(f"Archive error: {e}")
+                
+    except Exception as exc:
+        await callback.message.answer(f"❌ Yuklab olishda xato yuz berdi: {exc}")
+    finally:
+        if 'file_path' in locals() and os.path.exists(file_path): 
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        await wait_msg.delete()
+
+@dp.callback_query(F.data == "nav_close")
+async def nav_close(callback: types.CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+
+@dp.callback_query(F.data.in_({"nav_prev", "nav_next"}))
+async def nav_unsupported(callback: types.CallbackQuery):
+    await callback.answer("Hozircha faqat dastlabki 10 ta natija ko'rsatilmoqda ❤️", show_alert=True)
+
+
+# --- Inline Search Handler ---
+
+@dp.inline_query()
+async def inline_search(query: types.InlineQuery):
+    text = query.query.strip()
+    if not text:
+        return
+    
+    # Search in local cache index first
+    # This assumes the cache stores title/metadata along with file_id
+    # For now, we'll implement a simple keyword search in the cache
+    results = []
+    for item_id, file_id in archive_service.cache.items():
+        # In a real scenario, we'd store the title in the cache too.
+        # Let's assume the unique_id is the title for this simple version.
+        if text.lower() in item_id.lower():
+            results.append(
+                types.InlineQueryResultCachedAudio(
+                    id=item_id,
+                    audio_file_id=file_id,
+                    caption=f"✅ @toparchik_bot orqali ulashildi"
+                )
+            )
+    
+    await query.answer(results[:50], cache_time=300)
+
+async def main():
+    logger.info("Bot v2.0 start polling...")
+    # Create downloads directory if not exists
+    if not os.path.exists("downloads"):
+        os.makedirs("downloads")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    log("🤖 Bot polling rejimida ishga tushmoqda...")
-    while True:
-        try:
-            # Eski ulanishlarni tozalash (409 xatosini oldini olish uchun)
-            bot.remove_webhook()
-            time.sleep(1)
-            bot.infinity_polling(timeout=20, long_polling_timeout=20)
-        except Exception as e:
-            log(f"🔔 Polling xatosi: {e}")
-            time.sleep(10)
+    asyncio.run(main())

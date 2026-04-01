@@ -1,10 +1,13 @@
 # Python beys imidji (boti uchun)
 FROM python:3.11-slim
 
-# Tizimga kerakli dasturlarni (FFmpeg va Node.js) o'rnatish
-RUN apt-get update && apt-get install -y \
+# Tizimga kerakli dasturlarni (FFmpeg, Node.js va LibreOffice) o'rnatish
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     nodejs \
+    libreoffice \
+    fonts-liberation \
+    && ln -sf /usr/bin/nodejs /usr/bin/node \
     && rm -rf /var/lib/apt/lists/*
 
 # Ishchi katalogni belgilash
