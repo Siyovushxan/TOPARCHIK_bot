@@ -79,26 +79,46 @@ async def handle_voice(message: types.Message):
     file_path = f"downloads/{file_id}.oga"
     await bot.download_file(file.file_path, file_path)
     
-    # Transcription
-    transcript = await transcribe_audio(file_path)
-    # AI Summary
-    summary = await ask_gemini(f"Ushbu matnni qisqacha tahlil qilib, eng muhim tezislarni ajrat: {transcript}")
-    
-    final_text = f"📝 **Matn:**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
-    
-    # WOW Ad
-    ad_text = (
-        "\n\n---\n"
-        "✨ **Reklama:**\n"
-        "🚀 Bu yerda sizning reklamangiz bo'lishi mumkin! \n"
-        "Yuzlab foydalanuvchilarga biznesingizni ko'rsatmoqchimisiz? Biz bilan bog'laning! 💎"
-    )
-    
-    await wait_msg.edit_text(final_text + ad_text, reply_markup=ad_inline_markup(), parse_mode="Markdown")
-    
-    # Cleanup
-    if os.path.exists(file_path):
-        os.remove(file_path)
+    try:
+        # Transcription
+        transcript = await transcribe_audio(file_path)
+        
+        if transcript.startswith("Xatolik:"):
+            await wait_msg.edit_text(f"❌ Transkripsiya paytida xato yuz berdi:\n\n{transcript}")
+            return
+
+        # AI Summary
+        summary = await ask_gemini(f"Ushbu matnni qisqacha tahlil qilib, eng muhim tezislarni ajrat: {transcript}")
+        
+        final_text = f"📝 **Matn:**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
+        
+        # WOW Ad
+        ad_text = (
+            "\n\n---\n"
+            "✨ **Reklama:**\n"
+            "🚀 Bu yerda sizning reklamangiz bo'lishi mumkin! \n"
+            "Yuzlab foydalanuvchilarga biznesingizni ko'rsatmoqchimisiz? Biz bilan bog'laning! 💎"
+        )
+        
+        combined_text = final_text + ad_text
+        if len(combined_text) > 4000:
+            allowed_len = 4000 - len(summary) - len(ad_text) - 50
+            if allowed_len > 100:
+                transcript = transcript[:allowed_len] + "..."
+            else:
+                transcript = "Matn ko'rsatish uchun juda uzun."
+            final_text = f"📝 **Matn (qisqartirilgan):**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
+            combined_text = final_text + ad_text
+
+        await wait_msg.edit_text(combined_text, reply_markup=ad_inline_markup(), parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Voice handling failed: {e}")
+        await wait_msg.edit_text(f"❌ Kechirasiz, tahlil paytida xato yuz berdi: {str(e)[:100]}")
+    finally:
+        # Cleanup
+        if os.path.exists(file_path):
+            try: os.remove(file_path)
+            except: pass
 
 @dp.message(F.document)
 async def handle_document(message: types.Message):

@@ -7,11 +7,9 @@ from config import GEMINI_API_KEY
 # Models ordered from highest-quota/cheapest to lowest-quota.
 GEMINI_MODELS = (
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-flash-latest",
-    "gemini-flash-lite-latest",
-    "gemini-pro-latest",
-    "gemini-2.5-flash",
+    "gemini-2.0-flash-lite-preview-02-05",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
 )
 
 _GEMINI_DAILY_EXHAUSTED = {}  # model_name -> reset_timestamp
@@ -46,15 +44,18 @@ async def ask_gemini(prompt: str) -> str:
             continue
 
         try:
+            # Using synchronous client in loop.run_in_executor to ensure compatibility and stability 
+            # if AsyncClient has installation/environment specific issues, 
+            # but wrapping it correctly as requested.
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: client.models.generate_content(
-                    model=model_name,
+                lambda m=model_name: client.models.generate_content(
+                    model=m,
                     contents=prompt,
                 )
             )
-            if response.text:
+            if response and response.text:
                 return response.text
         except Exception as exc:
             if "api key" in str(exc).lower():
@@ -70,10 +71,10 @@ async def ask_gemini(prompt: str) -> str:
                     _GEMINI_DAILY_EXHAUSTED[model_name] = midnight.timestamp()
                     continue
                 else:
-                    GEMINI_BACKOFF_UNTIL = time.time() + 60
-                    return "AI limitga yetdi (1 min)."
+                    GEMINI_BACKOFF_UNTIL = time.time() + 30
+                    continue # Try next model if 429
             
             print(f"Gemini error ({model_name}): {exc}")
             continue
 
-    return "AI javob bera olmadi."
+    return "AI hozirda band. Iltimos, bir ozdan keyin urinib ko'ring."
