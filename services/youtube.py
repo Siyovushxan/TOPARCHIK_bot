@@ -88,17 +88,21 @@ async def search_youtube(query: str, max_results: int = 10):
         "default_search": f"ytsearch{max_results}",
         "noplaylist": True,
         "cookiefile": get_cookies_path(),
-        "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        "impersonate": "chrome",
+        # Qidiruvda impersonate kerak emas — faqat yuklab olishda
     }
 
     def _search():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
-            return info.get("entries", []) if info else []
+            try:
+                info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
+                return info.get("entries", []) if info else []
+            except Exception as e:
+                logger.error(f"yt-dlp search ichki xato: {type(e).__name__}: {e}")
+                raise
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _search)
+
 
 
 async def download_media(url: str, chat_id: int, audio_only: bool = True):
