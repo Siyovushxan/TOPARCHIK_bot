@@ -45,16 +45,30 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """
     yt-dlp extractor argumentlarini tuzadi.
-    iOS va mweb klientlari server IP'larida kamroq bloklash beradi.
+    
+    tv_embedded va web_embedded klientlari:
+    - PO Token talab qilmaydi
+    - JavaScript challenge kerak emas
+    - Cookie bilan ishlaydi
+    - Server IP'larida bloklash kamroq
     """
-    clients = ["ios", "mweb", "android", "web"]
+    # Cookie bo'lsa web client ham qo'shiladi (authenticated)
+    # Cookie bo'lmasa faqat embedded klientlar
+    has_cookies = get_cookies_path() is not None
+
+    if has_cookies:
+        # Authenticated klientlar - cookie bilan to'liq kirish
+        clients = ["tv_embedded", "web_embedded", "web_creator", "web"]
+    else:
+        # Anonim klientlar - embedded orqali
+        clients = ["tv_embedded", "web_embedded", "web_creator"]
 
     youtube_args: dict = {
         "player_client": clients,
     }
 
     if YOUTUBE_PO_TOKEN:
-        youtube_args["po_token"] = [f"mweb.gvs+{YOUTUBE_PO_TOKEN}", f"web+{YOUTUBE_PO_TOKEN}"]
+        youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
 
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
