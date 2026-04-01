@@ -293,12 +293,30 @@ async def inline_search(query: types.InlineQuery):
     
     await query.answer(results[:50], cache_time=300)
 
+async def health_server():
+    """Hugging Face uchun minimal web server (port 7860)."""
+    from aiohttp import web
+
+    async def handle(request):
+        return web.Response(text="✅ TOPARCHIK bot ishlayapti!", content_type="text/html")
+
+    app_web = web.Application()
+    app_web.router.add_get("/", handle)
+    runner = web.AppRunner(app_web)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 7860)
+    await site.start()
+    logger.info("Health server port 7860 da ishga tushdi.")
+
 async def main():
     logger.info("Bot v2.0 start polling...")
-    # Create downloads directory if not exists
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
-    await dp.start_polling(bot)
+    # Ikkalasini parallel ishlatamiz: bot + web server
+    await asyncio.gather(
+        health_server(),
+        dp.start_polling(bot),
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
