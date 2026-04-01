@@ -3,10 +3,9 @@ aiohttp
 google-genai
 google-generativeai
 yt-dlp
+curl-cffi
 python-dotenv
 python-pptx
 python-docx
 pdf2docx
 python-magic
-js2py
-pyjsparser

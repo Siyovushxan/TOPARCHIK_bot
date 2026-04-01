@@ -8,84 +8,59 @@ logger = logging.getLogger(__name__)
 
 
 def get_cookies_path():
-    """
-    Cookie faylini tayyorlaydi.
-    YOUTUBE_COOKIES o'zgaruvchisi fayl yo'li yoki Netscape formati mazmuni bo'lishi mumkin.
-    """
+    """Cookie faylini tayyorlaydi."""
     if not YOUTUBE_COOKIES:
-        logger.warning("YOUTUBE_COOKIES o'rnatilmagan. Bot detection xatosi bo'lishi mumkin!")
+        logger.warning("YOUTUBE_COOKIES o'rnatilmagan!")
         return None
 
-    # .env faylida qo'yilgan qo'shtirnoqlarni tozalash
     raw = YOUTUBE_COOKIES.strip()
+    # .env dagi qo'shtirnoqlarni tozalash
     if (raw.startswith('"') and raw.endswith('"')) or \
        (raw.startswith("'") and raw.endswith("'")):
         raw = raw[1:-1].strip()
 
-    # Agar to'g'ridan-to'g'ri fayl yo'li bo'lsa
+    # Agar fayl yo'li bo'lsa
     if os.path.isfile(raw):
-        logger.info(f"YouTube cookies fayldan o'qildi: {raw}")
+        logger.info(f"Cookie fayldan o'qildi: {raw}")
         return raw
 
-    # Agar Netscape cookie mazmuni bo'lsa — faylga yozamiz
+    # Agar Netscape cookie mazmuni bo'lsa
     if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
         cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-        # Agar Netscape sarlavhasi yo'q bo'lsa, uni qo'shib qo'yamiz
         if not raw.startswith("# Netscape"):
             raw = "# Netscape HTTP Cookie File\n" + raw
         with open(cookie_path, "w", encoding="utf-8") as f:
             f.write(raw)
-        logger.info(f"YouTube cookies yozildi: {cookie_path} ({len(raw)} bayt)")
+        logger.info(f"Cookie yozildi: {cookie_path} ({len(raw)} bayt)")
         return cookie_path
 
-    logger.warning("YOUTUBE_COOKIES to'g'ri formatda emas. Cookie ishlatilmaydi.")
+    logger.warning("YOUTUBE_COOKIES noto'g'ri format!")
     return None
 
 
 def build_youtube_profile() -> dict:
-    """
-    yt-dlp extractor argumentlarini tuzadi.
-    
-    tv_embedded va web_embedded klientlari:
-    - PO Token talab qilmaydi
-    - JavaScript challenge kerak emas
-    - Cookie bilan ishlaydi
-    - Server IP'larida bloklash kamroq
-    """
-    # Cookie bo'lsa web client ham qo'shiladi (authenticated)
-    # Cookie bo'lmasa faqat embedded klientlar
-    has_cookies = get_cookies_path() is not None
-
-    if has_cookies:
-        # Authenticated klientlar - cookie bilan to'liq kirish
-        clients = ["tv_embedded", "web_embedded", "web_creator", "web"]
-    else:
-        # Anonim klientlar - embedded orqali
-        clients = ["tv_embedded", "web_embedded", "web_creator"]
-
+    """yt-dlp uchun YouTube extractor argumentlari."""
     youtube_args: dict = {
-        "player_client": clients,
+        "player_client": ["web"],
     }
-
     if YOUTUBE_PO_TOKEN:
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
-
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
-
     return {"extractor_args": {"youtube": youtube_args}}
 
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
-    cookie_file = get_cookies_path()
+    """yt-dlp uchun parametrlar. curl-cffi orqali Chrome sifatida ko'rinamiz."""
     opts = {
         "outtmpl": outtmpl,
         "quiet": True,
         "noprogress": True,
         "extractor_retries": 5,
         "retries": 3,
-        "cookiefile": cookie_file,
+        "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
+        "impersonate": "chrome",  # curl-cffi: bot emas, Chrome brauzer sifatida
     }
 
     if audio_only:
@@ -114,6 +89,7 @@ async def search_youtube(query: str, max_results: int = 10):
         "noplaylist": True,
         "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
+        "impersonate": "chrome",
     }
 
     def _search():
