@@ -164,7 +164,7 @@ async def handle_text(message: types.Message):
             archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
             
         except Exception as exc:
-            await message.answer(f"❌ Media yuklashda xato: {exc}")
+            await message.answer(f"❌ Media yuklashda xato: {exc}", disable_web_page_preview=True)
         finally:
             if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
             await wait_msg.delete()
@@ -248,7 +248,7 @@ async def process_download(callback: types.CallbackQuery):
                 logger.error(f"Archive error: {e}")
                 
     except Exception as exc:
-        await callback.message.answer(f"❌ Yuklab olishda xato yuz berdi: {exc}")
+        await callback.message.answer(f"❌ Yuklab olishda xato yuz berdi: {exc}", disable_web_page_preview=True)
     finally:
         if 'file_path' in locals() and os.path.exists(file_path): 
             try:

@@ -3,6 +3,23 @@ import os
 import yt_dlp
 from config import DOWNLOAD_DIR, YOUTUBE_COOKIES, YOUTUBE_PO_TOKEN, YOUTUBE_VISITOR_DATA
 
+def get_cookies_path():
+    if not YOUTUBE_COOKIES:
+        return None
+    
+    # If it's already a file path that exists
+    if os.path.isfile(YOUTUBE_COOKIES):
+        return YOUTUBE_COOKIES
+        
+    # If it's the cookie content (starts with # Netscape)
+    if YOUTUBE_COOKIES.strip().startswith("# Netscape"):
+        cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            f.write(YOUTUBE_COOKIES.strip())
+        return cookie_path
+        
+    return None
+
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     opts = {
         "outtmpl": outtmpl,
@@ -10,6 +27,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "noprogress": True,
         "extractor_retries": 5,
         "retries": 3,
+        "cookiefile": get_cookies_path(),
     }
     
     if audio_only:
@@ -26,28 +44,28 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
             "format": "bestvideo[height<=720]+bestaudio/best[height<=720]",
         })
 
-    # We DO NOT use YOUTUBE_COOKIES unconditionally anymore because logged-in YouTube 
-    # serves modern ES6 obfuscated Javascript which js2py cannot parse, 
-    # causing "Signature solving failed" errors on public music videos!
-    # Cookies should only be used as a last resort for age-restricted content.
+    # Add tokens and reliable clients
+    opts["extractor_args"] = build_youtube_profile().get("extractor_args", {})
         
     return opts
 
 def build_youtube_profile():
-    # Since we have installed js2py, the default WEB client is now fully functional and fast.
-    extractor_args = {}
+    # Use mweb and ios clients which are less likely to trigger "Sign in to confirm you're not a bot"
+    # Even without a PO token, these often work better on server IPs.
+    clients = ["mweb", "ios", "android", "web"]
+    
+    youtube_args = {
+        "player_client": clients,
+    }
+    
     if YOUTUBE_PO_TOKEN:
-        extractor_args = {
-            "youtube": {
-                "player_client": ["mweb", "web"],
-                "po_token": [f"mweb.gvs+{YOUTUBE_PO_TOKEN}"],
-            }
-        }
-        if YOUTUBE_VISITOR_DATA:
-            extractor_args["youtube"]["visitor_data"] = [YOUTUBE_VISITOR_DATA]
-            extractor_args["youtube"]["player_skip"] = ["configs", "webpage"]
+        # Some clients use po_token differently
+        youtube_args["po_token"] = [f"mweb.gvs+{YOUTUBE_PO_TOKEN}", f"web+{YOUTUBE_PO_TOKEN}"]
+    
+    if YOUTUBE_VISITOR_DATA:
+        youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
             
-    return {"name": "default", "extractor_args": extractor_args}
+    return {"name": "default", "extractor_args": {"youtube": youtube_args}}
 
 async def search_youtube(query: str, max_results: int = 10):
     """Async search for YouTube content."""
