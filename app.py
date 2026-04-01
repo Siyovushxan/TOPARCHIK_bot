@@ -295,10 +295,19 @@ async def inline_search(query: types.InlineQuery):
 
 async def main():
     logger.info("Bot v2.0 start polling...")
-    # Create downloads directory if not exists
+    # downloads papkasini yaratish
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
+    
+    # Avvalgi webhook va eski so'rovlarni o'chirish (Conflict xatosini oldini olish)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook o'chirildi, eski so'rovlar tashlandi.")
+    except Exception as e:
+        logger.warning(f"Webhook o'chirishda xato: {e}")
+
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
