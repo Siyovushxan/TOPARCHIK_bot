@@ -127,15 +127,35 @@ async def command_help_handler(message: Message) -> None:
 
 @dp.message(F.text == "📥 Media")
 async def media_menu(message: types.Message):
-    await message.answer("Siz ijtimoiy tarmoqlardan (YT, TT, IG) video yoki musiqa yuklab olishingiz mumkin. Shunchaki link yoki nomini yozing!")
+    text = (
+        "<b>📥 Media yuklab olish bo'limi:</b>\n\n"
+        "1️⃣ YouTube videolarni havola (link) orqali yuklash.\n"
+        "2️⃣ Instagram Reels va TikTok videolarini yuklash.\n"
+        "3️⃣ Musiqa nomini yozib qidirish.\n\n"
+        "💡 <i>Shunchaki link yoki qo'shiq nomini yozib yuboring!</i>" + PROMO_TEXT
+    )
+    await message.answer(text, parse_mode="HTML")
 
 @dp.message(F.text == "📄 Word<->Pdf")
 async def docs_menu(message: types.Message):
-    await message.answer("PDF fayllarni Word'ga va Word fayllarni PDF ga aylantirishim mumkin. Faylni yuboring!")
+    text = (
+        "<b>📄 Hujjatlarni konvertatsiya qilish bo'limi:</b>\n\n"
+        "1️⃣ .pdf faylingizni Word (.docx) holatiga o'tkazish.\n"
+        "2️⃣ .docx yoki .doc faylingizni PDF holatiga o'tkazish.\n\n"
+        "💡 <i>Buning uchun hujjatni botga fayl ko'rinishida yuboring!</i>" + PROMO_TEXT
+    )
+    await message.answer(text, parse_mode="HTML")
 
 @dp.message(F.text == "🎙 Ovozli Tahlil")
 async def voice_menu(message: types.Message):
-    await message.answer("Ovozli xabar yuboring, men uni matnga aylantirib, asosiylarini tahlil qilib beraman!")
+    text = (
+        "<b>🎙 Ovozli tahlil bo'limi:</b>\n\n"
+        "1️⃣ Ovozli xabar yuborib uni matnga o'girishingiz mumkin.\n"
+        "2️⃣ AI orqali ovozli xabarning qisqacha mazmunini olish.\n"
+        "3️⃣ Kelajakda qo'shiqni ovoz orqali topish (Tez kunda).\n\n"
+        "💡 <i>Ovozli xabar (voice) yuboring!</i>" + PROMO_TEXT
+    )
+    await message.answer(text, parse_mode="HTML")
 
 # --- Universal Input Handler ---
 
