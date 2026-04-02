@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def get_cookies_path():
     """Cookie faylini tayyorlaydi."""
     if not YOUTUBE_COOKIES:
-        logger.warning("YOUTUBE_COOKIES o'rnatilmagan!")
+        logger.warning("YOUTUBE_COOKIES o'rnatilmagan — cookie siz urinib ko'riladi.")
         return None
 
     raw = YOUTUBE_COOKIES.strip()
@@ -21,41 +21,57 @@ def get_cookies_path():
 
     # Agar fayl yo'li bo'lsa
     if os.path.isfile(raw):
-        logger.info(f"Cookie fayldan o'qildi: {raw}")
+        size = os.path.getsize(raw)
+        if size < 500:
+            logger.error(f"Cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
+            return None
+        logger.info(f"Cookie fayldan o'qildi: {raw} ({size} bayt)")
         return raw
 
     # Agar Netscape cookie mazmuni bo'lsa
     if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
         cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-        
+
         # Header qo'shish (agar yo'q bo'lsa)
         if not raw.startswith("# Netscape"):
             raw = "# Netscape HTTP Cookie File\n" + raw
 
-        # Har doim qaytadan yozish o'rniga, mavjud bo'lsa va hajmi bir xil bo'lsa — qaytadan yozmaymiz
+        # Mavjud bo'lsa va mazmuni bir xil bo'lsa — qaytadan yozmaymiz
         if os.path.exists(cookie_path):
             with open(cookie_path, "r", encoding="utf-8") as f:
                 if f.read() == raw:
+                    size = os.path.getsize(cookie_path)
+                    if size < 500:
+                        logger.error(f"Mavjud cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
+                        return None
                     return cookie_path
-             
+
         with open(cookie_path, "w", encoding="utf-8") as f:
             f.write(raw)
-        logger.info(f"Cookie yozildi: {cookie_path} ({len(raw)} bayt)")
+
+        size = os.path.getsize(cookie_path)
+        if size < 500:
+            logger.error(f"Yozilgan cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
+            return None
+
+        logger.info(f"Cookie yozildi: {cookie_path} ({size} bayt)")
         return cookie_path
 
-    logger.warning("YOUTUBE_COOKIES noto'g'ri format!")
+    logger.warning("YOUTUBE_COOKIES noto'g'ri format — cookie siz urinib ko'riladi.")
     return None
 
 
 def build_youtube_profile() -> dict:
-    """yt-dlp uchun YouTube extractor argumentlari."""
+    """yt-dlp uchun YouTube extractor argumentlari.
+    
+    ios va android clientlari cookie talab qilmaydi va
+    YouTube tomonidan kamroq bloklanadi.
+    """
     youtube_args: dict = {
-        # 'ios' va 'web_creator' hozirda eng barqaror mijozlar
-        "player_client": ["ios", "web_creator", "mweb", "android", "web"],
+        "player_client": ["ios", "android"],
         "force_ipv4": True,
     }
     if YOUTUBE_PO_TOKEN:
-        # web.gvs+ prefixini faqat web mijozlari uchun emas, universal qo'llash
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
@@ -64,6 +80,8 @@ def build_youtube_profile() -> dict:
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     """yt-dlp uchun parametrlar."""
+    cookie_path = get_cookies_path()
+
     opts = {
         "outtmpl": outtmpl,
         "quiet": True,
@@ -71,26 +89,29 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "no_warnings": True,
         "extractor_retries": 10,
         "retries": 10,
-        "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
         "ignoreerrors": False,
         "no_color": True,
-        "source_address": "0.0.0.0", # IPv4 ni majburlash
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "source_address": "0.0.0.0",
+        "user_agent": (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        ),
         "http_headers": {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
-            "Sec-Fetch-Mode": "navigate",
         },
-        "concurrent_fragment_downloads": 5,
-        "external_downloader": "ffmpeg",
+        "concurrent_fragment_downloads": 4,
         "geo_bypass": True,
         "nocheckcertificate": True,
     }
 
+    # Cookie faqat mavjud va yaroqli bo'lganda qo'shiladi
+    if cookie_path:
+        opts["cookiefile"] = cookie_path
+
     if audio_only:
         opts.update({
-            # Formatni eng sodda holatga keltiramiz
             "format": "bestaudio/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
@@ -109,16 +130,22 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
 async def search_youtube(query: str, max_results: int = 10):
     """YouTube dan asinxron qidirish."""
     cookie_path = get_cookies_path()
+
     ydl_opts = {
         "quiet": True,
         "extract_flat": True,
         "default_search": f"ytsearch{max_results}",
         "noplaylist": True,
-        "cookiefile": cookie_path,
         "no_warnings": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "user_agent": (
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        ),
     }
+
+    if cookie_path:
+        ydl_opts["cookiefile"] = cookie_path
 
     def _search():
         try:
@@ -131,7 +158,6 @@ async def search_youtube(query: str, max_results: int = 10):
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _search)
-
 
 
 async def download_media(url: str, chat_id: int, audio_only: bool = True):
@@ -147,38 +173,39 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
             with yt_dlp.YoutubeDL(opts) as ydl:
                 _info = ydl.extract_info(url, download=True)
                 final_filename = ydl.prepare_filename(_info)
-                
-                # Check for post-processed mp3
+
                 if audio_only:
                     base_path = os.path.splitext(final_filename)[0]
                     mp3_path = base_path + ".mp3"
                     if os.path.exists(mp3_path):
                         return _info, mp3_path
-                
+
                 return _info, final_filename
         except Exception as e:
             msg = str(e)
-            if "format is not available" in msg:
-                msg = "Ushbu audioga ruxsat berilmadi yoki format topilmadi. Iltimos boshqa variantni tanlang."
+            if "Sign in to confirm" in msg or "bot" in msg.lower():
+                msg = (
+                    "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
+                    "Iltimos cookie ni yangilang yoki keyinroq urinib ko'ring."
+                )
+            elif "format is not available" in msg:
+                msg = "Ushbu audioga ruxsat berilmadi yoki format topilmadi."
             logger.error(f"Download error for {url}: {e}")
             raise Exception(msg)
 
     loop = asyncio.get_event_loop()
-    try:
-        info, final_path = await loop.run_in_executor(None, _download)
-    except Exception as e:
-        logger.error(f"Executor error: {e}")
-        raise e
+    info, final_path = await loop.run_in_executor(None, _download)
 
-    # Backup check for file existence
+    # Backup: boshqa kengaytmalarni tekshirish
     if not os.path.exists(final_path):
         base_path = os.path.splitext(final_path)[0]
-        for ext in ['.mp3', '.m4a', '.webm', '.mp4']:
-            if os.path.exists(base_path + ext):
-                final_path = base_path + ext
+        for ext in ['.mp3', '.m4a', '.webm', '.mp4', '.opus']:
+            candidate = base_path + ext
+            if os.path.exists(candidate):
+                final_path = candidate
                 break
-    
+
     if not os.path.exists(final_path):
-         raise Exception("Fayl yuklandi, lekin saqlashda xato yuz berdi (topilmadi).")
+        raise Exception("Fayl yuklandi, lekin saqlashda xato yuz berdi (topilmadi).")
 
     return info, final_path
