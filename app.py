@@ -33,19 +33,17 @@ def get_web_app_button():
         if url:
             logger.warning("Invalid WEB_APP_URL for Telegram WebApp button: %s. Skipping web app button.", url)
         return None
-    return KeyboardButton(text="🚀 Appni ochish", web_app=WebAppInfo(url=url))
+    return KeyboardButton(text="🚀 Open", web_app=WebAppInfo(url=url))
 
 
 def main_menu():
     builder = ReplyKeyboardBuilder()
-    builder.add(KeyboardButton(text="📥 Media"))
-    builder.add(KeyboardButton(text="📄 Word<->Pdf"))
-    builder.add(KeyboardButton(text="🎤 Artistlar"))
-    builder.add(KeyboardButton(text="🆘 Help"))
     web_app_button = get_web_app_button()
     if web_app_button:
         builder.add(web_app_button)
-    builder.adjust(2)
+    else:
+        builder.add(KeyboardButton(text="🆘 Help"))
+    builder.adjust(1)
     return builder.as_markup(resize_keyboard=True)
 
 
@@ -87,17 +85,14 @@ def parse_artist_from_title(title: str) -> str:
 
 WELCOME_TEXT = (
     "<b>✨ TOPARCHIK AI - Universal Media App</b>\n\n"
-    "Sizga media yuklash, hujjat konvertatsiyasi va aqlli yordamchi xizmatlarini bitta joyda taqdim etamiz.\n\n"
-    "<b>🎯 Asosiy imkoniyatlar:</b>\n"
-    "• <b>Media:</b> YouTube/Instagram/TikTok linklarini yuklab oling.\n"
-    "• <b>Hujjatlar:</b> PDF ↔ Word konvertatsiyasi.\n"
-    "• <b>Artistlar:</b> eng zo‘r ijrochilar bo‘limi tez orada.\n"
-    "• <b>AI yordamchi:</b> savolingizga aqlli javoblar.\n\n"
-    "<b>🚀 Boshlash uchun:</b>\n"
-    "1️⃣ Quyidagi menyudan kerakli bo‘limni tanlang.\n"
-    "2️⃣ Link, matn yoki fayl yuboring.\n"
-    "3️⃣ Natijani kuting va bahramand bo‘ling.\n\n"
-    "<i>Quyidagi tugmalardan birini tanlang yoki /help yozing.</i>" + PROMO_TEXT
+    "Web App interfeysini ochish uchun pastdagi <b>🚀 Open</b> tugmasini bosing.\n"
+    "Bu sizga Telegram ichida alohida sahifada kanalga yuklangan qo‘shiqlarni, janrlarni, top yo‘llanmalarni va platforma bo‘yicha toifalarni ko‘rish imkonini beradi.\n\n"
+    "<b>🎯 Nimalar kutishingiz mumkin:</b>\n"
+    "• <b>Top yuklanganlar</b> va eng so‘nggi qo‘shiqlar.\n"
+    "• <b>YouTube / Instagram / TikTok</b> bo‘limlari.\n"
+    "• <b>Janrlar</b> va mashhur artistlar.\n"
+    "• <b>Oddiy, tezkor</b> media va musiqani eshitish imkoniyati.\n\n"
+    "<i>Bot ichidan o‘ziga xos app ochiladi, keyin alohida sahifada tinglash va tanlash mumkin.</i>" + PROMO_TEXT
 )
 HELP_TEXT = (
     "<b>🆘 Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
