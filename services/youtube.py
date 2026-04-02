@@ -41,10 +41,6 @@ def get_cookies_path():
     if (raw.startswith('"') and raw.endswith('"')) or \
        (raw.startswith("'") and raw.endswith("'")):
         raw = raw[1:-1].strip()
-    # .env dagi qo'shtirnoqlarni tozalash
-    if (raw.startswith('"') and raw.endswith('"')) or \
-       (raw.startswith("'") and raw.endswith("'")):
-        raw = raw[1:-1].strip()
 
     # Agar fayl yo'li bo'lsa
     if os.path.isfile(raw):

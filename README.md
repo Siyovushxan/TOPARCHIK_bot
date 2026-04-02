@@ -14,3 +14,14 @@ Musiqa qidirish, video yuklash va aqlli AI tahlili bitta botda! 🚀
 - **Daqiqa**: Qo'shiqlar davomiyligi ko'rinishi.
 
 # Toparchik AI Universal Bot
+
+## Environment configuration
+
+The bot requires environment variables for Telegram and YouTube settings. Copy `.env.example` to `.env` and fill in your values.
+
+- `BOT_TOKEN` — your Telegram bot token
+- `YOUTUBE_COOKIES_PATH` — path to a valid YouTube cookies file
+- `WEB_APP_URL` — your HTTPS web app URL ending with `/webapp`
+
+For Railway deployment, set these values in Railway secrets or environment variables instead of a local `.env` file.
+

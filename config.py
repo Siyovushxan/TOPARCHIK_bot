@@ -3,7 +3,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+
+# Load .env from the package directory if present, otherwise fall back to the repository root.
 load_dotenv(Path(BASE_DIR) / ".env")
+load_dotenv(Path(ROOT_DIR) / ".env")
 
 # Telegram Bot API
 BOT_TOKEN = os.getenv("BOT_TOKEN")
