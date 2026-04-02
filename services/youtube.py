@@ -4,18 +4,43 @@ import re
 import logging
 import yt_dlp
 from googleapiclient.discovery import build
-from config import DOWNLOAD_DIR, YOUTUBE_COOKIES, YOUTUBE_PO_TOKEN, YOUTUBE_VISITOR_DATA, YOUTUBE_API_KEY
+from config import (
+    DOWNLOAD_DIR,
+    YOUTUBE_COOKIES,
+    YOUTUBE_COOKIES_PATH,
+    YOUTUBE_PO_TOKEN,
+    YOUTUBE_VISITOR_DATA,
+    YOUTUBE_API_KEY
+)
 
 logger = logging.getLogger(__name__)
 
 
 def get_cookies_path():
     """Cookie faylini tayyorlaydi."""
-    if not YOUTUBE_COOKIES:
-        logger.warning("YOUTUBE_COOKIES o'rnatilmagan — cookie siz urinib ko'riladi.")
+    raw = None
+    if YOUTUBE_COOKIES:
+        raw = YOUTUBE_COOKIES.strip()
+    elif YOUTUBE_COOKIES_PATH:
+        raw = YOUTUBE_COOKIES_PATH.strip()
+
+    # If both env vars are missing, try a default local cookie file.
+    default_cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
+    if not raw and os.path.isfile(default_cookie_path):
+        logger.info(f"YOUTUBE_COOKIES topilmadi, lekin default cookie fayl topildi: {default_cookie_path}")
+        return default_cookie_path
+
+    if not raw:
+        logger.warning(
+            "YOUTUBE_COOKIES va YOUTUBE_COOKIES_PATH o'rnatilmagan — cookie ishlatilmaydi."
+            " Railway yoki hosting muhitingizga bu qiymatni qo'shing."
+        )
         return None
 
-    raw = YOUTUBE_COOKIES.strip()
+    # .env dagi qo'shtirnoqlarni tozalash
+    if (raw.startswith('"') and raw.endswith('"')) or \
+       (raw.startswith("'") and raw.endswith("'")):
+        raw = raw[1:-1].strip()
     # .env dagi qo'shtirnoqlarni tozalash
     if (raw.startswith('"') and raw.endswith('"')) or \
        (raw.startswith("'") and raw.endswith("'")):
