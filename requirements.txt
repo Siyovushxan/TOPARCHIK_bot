@@ -9,3 +9,4 @@ python-pptx
 python-docx
 pdf2docx
 python-magic
+google-api-python-client

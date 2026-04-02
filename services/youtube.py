@@ -2,7 +2,8 @@ import asyncio
 import os
 import logging
 import yt_dlp
-from config import DOWNLOAD_DIR, YOUTUBE_COOKIES, YOUTUBE_PO_TOKEN, YOUTUBE_VISITOR_DATA
+from googleapiclient.discovery import build
+from config import DOWNLOAD_DIR, YOUTUBE_COOKIES, YOUTUBE_PO_TOKEN, YOUTUBE_VISITOR_DATA, YOUTUBE_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -145,9 +146,45 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
 
 
 async def search_youtube(query: str, max_results: int = 10):
-    """YouTube dan asinxron qidirish."""
-    cookie_path = get_cookies_path()
+    """YouTube dan asinxron qidirish (YouTube Data API v3 orqali)."""
+    if not YOUTUBE_API_KEY or YOUTUBE_API_KEY == "Sizning_API_kalitingiz":
+        logger.warning("YOUTUBE_API_KEY o'rnatilmagan - yt-dlp ishlatiladi.")
+        return await _search_yt_dlp(query, max_results)
 
+    def _search_api():
+        try:
+            youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+            request = youtube.search().list(
+                q=query,
+                part="id,snippet",
+                type="video",
+                maxResults=max_results
+            )
+            response = request.execute()
+            
+            results = []
+            for item in response.get("items", []):
+                video_id = item["id"].get("videoId")
+                if video_id:
+                    results.append({
+                        "id": video_id,
+                        "title": item["snippet"]["title"],
+                        "url": f"https://www.youtube.com/watch?v={video_id}",
+                        "duration": 0  # API v3 qidiruvda davomiylikni bermaydi
+                    })
+            return results
+        except Exception as e:
+            logger.error(f"YouTube API search error: {e}")
+            # Agar API limit tugasa yoki xato bo'lsa, yt-dlp ga o'tish
+            return _search_yt_dlp_sync(query, max_results)
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _search_api)
+
+
+def _search_yt_dlp_sync(query: str, max_results: int = 10):
+    """yt-dlp orqali sinxron qidiruv (zaxira)."""
+    cookie_path = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "extract_flat": True,
@@ -157,21 +194,22 @@ async def search_youtube(query: str, max_results: int = 10):
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
         "impersonate": "chrome",
     }
-
     if cookie_path:
         ydl_opts["cookiefile"] = cookie_path
 
-    def _search():
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
-                return info.get("entries", []) if info else []
-        except Exception as e:
-            logger.error(f"yt-dlp search error: {e}")
-            return []
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
+            return info.get("entries", []) if info else []
+    except Exception as e:
+        logger.error(f"yt-dlp search error: {e}")
+        return []
 
+
+async def _search_yt_dlp(query: str, max_results: int = 10):
+    """yt-dlp orqali asinxron qidiruv (zaxira)."""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _search)
+    return await loop.run_in_executor(None, lambda: _search_yt_dlp_sync(query, max_results))
 
 
 async def download_media(url: str, chat_id: int, audio_only: bool = True):
