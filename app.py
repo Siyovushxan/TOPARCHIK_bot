@@ -1,11 +1,13 @@
 import asyncio
 import logging
 import os
+import re
 import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import BotCommand, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
+from urllib.parse import quote_plus, unquote_plus
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
 import config
@@ -27,6 +29,8 @@ def main_menu():
     builder = ReplyKeyboardBuilder()
     builder.add(KeyboardButton(text="📥 Media"))
     builder.add(KeyboardButton(text="📄 Word<->Pdf"))
+    builder.add(KeyboardButton(text="🎤 Artistlar"))
+    builder.add(KeyboardButton(text="🆘 Help"))
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 
@@ -57,23 +61,35 @@ async def old_menu_handler(message: types.Message):
 # --- Prompts and Constants ---
 BOT_LINK = "@toparchik_bot"
 PROMO_TEXT = f"\n\n🔥 <i>Eng sara musiqalar va aqlli AI xizmatlari faqat bizda: {BOT_LINK}</i>"
+
+def parse_artist_from_title(title: str) -> str:
+    if not title:
+        return ""
+    parts = re.split(r'[-–—:]', title, maxsplit=1)
+    if len(parts) > 1 and parts[0].strip():
+        return parts[0].strip()
+    return ""
+
 WELCOME_TEXT = (
-    "<b>👋 Xush kelibsiz!</b>\n\n"
-    "Toparchik AI Universal Bot sizga quyidagi xizmatlarni tez va qulay taqdim etadi:\n"
-    "• <b>Media yuklash:</b> YouTube, Instagram, TikTok linklaridan audio/video olish.\n"
-    "• <b>Hujjat konvertatsiyasi:</b> PDF ↔ Word.\n"
+    "<b>✨ TOPARCHIK AI - Universal Media App</b>\n\n"
+    "Sizga media yuklash, hujjat konvertatsiyasi va aqlli yordamchi xizmatlarini bitta joyda taqdim etamiz.\n\n"
+    "<b>🎯 Asosiy imkoniyatlar:</b>\n"
+    "• <b>Media:</b> YouTube/Instagram/TikTok linklarini yuklab oling.\n"
+    "• <b>Hujjatlar:</b> PDF ↔ Word konvertatsiyasi.\n"
+    "• <b>Artistlar:</b> eng zo‘r ijrochilar bo‘limi tez orada.\n"
     "• <b>AI yordamchi:</b> savolingizga aqlli javoblar.\n\n"
-    "<b>Qanday boshlash kerak?</b>\n"
+    "<b>🚀 Boshlash uchun:</b>\n"
     "1️⃣ Quyidagi menyudan kerakli bo‘limni tanlang.\n"
-    "2️⃣ Link, matn, yoki fayl yuboring.\n"
-    "3️⃣ Bot sizga natijani tezda yetkazadi.\n\n"
-    "<i>Botni sinab ko‘rish uchun /help ni bosing yoki o‘ng pastdagi menyudan tanlang.</i>" + PROMO_TEXT
+    "2️⃣ Link, matn yoki fayl yuboring.\n"
+    "3️⃣ Natijani kuting va bahramand bo‘ling.\n\n"
+    "<i>Quyidagi tugmalardan birini tanlang yoki /help yozing.</i>" + PROMO_TEXT
 )
 HELP_TEXT = (
     "<b>🆘 Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
-    "1️⃣ <b>Musiqa topish:</b> Shunchaki nomi yoki ijrochini yozing.\n"
-    "2️⃣ <b>Link orqali yuklash:</b> Video havolasini (link) yuboring.\n"
-    "3️⃣ <b>Fayllar:</b> .docx yoki PDF fayllarni yuboring.\n\n"
+    "1️⃣ <b>📥 Media:</b> YouTube, Instagram yoki TikTok linkini yuboring.\n"
+    "2️⃣ <b>📄 Hujjatlar:</b> PDF yoki Word fayl yuboring.\n"
+    "3️⃣ <b>🎤 Artistlar:</b> sevimli ijrochilaringizni tez orada toping.\n\n"
+    "<b>📌 Eslatma:</b> Har bir bo‘limni tezda tanlash uchun menyudan foydalaning.\n\n"
     "💎 <i>Botimiz 24/7 xizmatingizda!</i>" + PROMO_TEXT
 )
 
@@ -107,7 +123,8 @@ async def archive_all_results_task(results):
             )
             
             # Bazaga yozish
-            archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+            artist_name = parse_artist_from_title(info.get('title', ''))
+            archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
             
             # Faylni o'chirish
             if os.path.exists(file_path): os.remove(file_path)
@@ -121,7 +138,7 @@ async def archive_all_results_task(results):
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    await message.answer(WELCOME_TEXT, parse_mode="HTML")
+    await message.answer(WELCOME_TEXT, reply_markup=main_menu(), parse_mode="HTML")
 
 @dp.message(Command("help"))
 async def command_help_handler(message: Message) -> None:
@@ -149,6 +166,29 @@ async def docs_menu(message: types.Message):
         "⚠️ <i>Eslatma: Fayllar hajmi 20 MB dan oshmasligi tavsiya etiladi.</i>" + PROMO_TEXT,
         parse_mode="HTML"
     )
+
+@dp.message(F.text == "🎤 Artistlar")
+async def artist_menu(message: types.Message):
+    artists = archive_service.get_all_artists()
+    if not artists:
+        await message.answer(
+            "🎤 Hozircha artistlar mavjud emas. Iltimos, birinchi qo'shiqni yuklab, keyin qayta urinib ko'ring.",
+            reply_markup=main_menu()
+        )
+        return
+
+    text = "<b>🎤 Artistlar bo‘limi</b>\n\n" \
+           "Quyidagi ijrochilardan birini tanlang:\n\n"
+    builder = InlineKeyboardBuilder()
+    for artist in artists:
+        builder.add(InlineKeyboardButton(text=artist, callback_data=f"artist_sel_{quote_plus(artist)}"))
+    builder.adjust(2)
+    builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
+    await message.answer(text + PROMO_TEXT, reply_markup=builder.as_markup(), parse_mode="HTML")
+
+@dp.message(F.text == "🆘 Help")
+async def help_button_handler(message: types.Message):
+    await command_help_handler(message)
 
 # --- Universal Input Handler ---
 
@@ -230,7 +270,8 @@ async def handle_text(message: types.Message, override_text: str = None):
                 caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}",
                 title=info.get('title', '')
             )
-            archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+            artist_name = parse_artist_from_title(info.get('title', ''))
+            archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
             
         except Exception as exc:
             await message.answer(f"❌ Media yuklashda xato: {exc}", disable_web_page_preview=True)
@@ -320,7 +361,8 @@ async def process_download(callback: types.CallbackQuery):
                     caption=f"#musiqa {info.get('title', '')}",
                     title=info.get('title', '')
                 )
-                archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+                artist_name = parse_artist_from_title(info.get('title', ''))
+                archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
             except Exception as e:
                 logger.error(f"Archive error: {e}")
                 
@@ -342,6 +384,53 @@ async def nav_close(callback: types.CallbackQuery):
 @dp.callback_query(F.data.in_({"nav_prev", "nav_next"}))
 async def nav_unsupported(callback: types.CallbackQuery):
     await callback.answer("Hozircha faqat dastlabki 10 ta natija ko'rsatilmoqda ❤️", show_alert=True)
+
+@dp.callback_query(F.data.startswith("artist_sel_"))
+async def artist_selected(callback: types.CallbackQuery):
+    artist = unquote_plus(callback.data.split("_", 1)[1])
+    songs = archive_service.get_songs_by_artist(artist)
+    if not songs:
+        await callback.answer("Bu artist uchun qo'shiq topilmadi.", show_alert=True)
+        return
+
+    def format_duration(seconds):
+        if not seconds:
+            return ""
+        mins, secs = divmod(int(seconds), 60)
+        return f" ({mins}:{secs:02d})"
+
+    response_text = f"<b>🎶 {artist} qo'shiqlari:</b>\n\n"
+    builder = InlineKeyboardBuilder()
+    buttons = []
+    for i, song in enumerate(songs[:10], 1):
+        response_text += f"<b>{i}.</b> {song['title']}{format_duration(song.get('duration', 0))}\n"
+        buttons.append(InlineKeyboardButton(text=str(i), callback_data=f"dl_{song['id']}"))
+
+    if buttons:
+        builder.add(*buttons)
+        builder.adjust(5, 5)
+
+    builder.add(InlineKeyboardButton(text="⬅️ Orqaga", callback_data="artist_back"))
+    builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
+    await callback.message.answer(response_text + PROMO_TEXT, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "artist_back")
+async def artist_back(callback: types.CallbackQuery):
+    artists = archive_service.get_all_artists()
+    if not artists:
+        await callback.answer("Hozircha artistlar mavjud emas.", show_alert=True)
+        return
+
+    text = "<b>🎤 Artistlar bo‘limi</b>\n\n" \
+           "Quyidagi ijrochilardan birini tanlang:\n\n"
+    builder = InlineKeyboardBuilder()
+    for artist in artists:
+        builder.add(InlineKeyboardButton(text=artist, callback_data=f"artist_sel_{quote_plus(artist)}"))
+    builder.adjust(2)
+    builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
+    await callback.message.answer(text + PROMO_TEXT, reply_markup=builder.as_markup(), parse_mode="HTML")
+    await callback.answer()
 
 
 # --- Inline Search Handler ---
