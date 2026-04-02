@@ -65,11 +65,10 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """yt-dlp uchun YouTube extractor argumentlari.
     
-    ios va android clientlari cookie talab qilmaydi va
-    YouTube tomonidan kamroq bloklanadi.
+    ios va android clientlari serverlarda bloklanish ehtimoli ancha past.
     """
     youtube_args: dict = {
-        "player_client": ["ios", "android", "web"],
+        "player_client": ["ios", "android", "mweb"], # mweb (mobile web) ham ba'zan yordam beradi
         "force_ipv4": True,
         "include_dash_manifest": False,
         "include_hls_manifest": False,
@@ -77,7 +76,6 @@ def build_youtube_profile() -> dict:
     
     # PO Token va Visitor Data ni formatlash
     if YOUTUBE_PO_TOKEN:
-        # Har xil clientlar uchun token formatlari
         youtube_args["po_token"] = [
             f"web+{YOUTUBE_PO_TOKEN}",
             f"ios+{YOUTUBE_PO_TOKEN}",
@@ -91,42 +89,39 @@ def build_youtube_profile() -> dict:
 
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
-    """yt-dlp uchun parametrlar."""
+    """yt-dlp uchun optimallashtirilgan parametrlar."""
     cookie_path = get_cookies_path()
+    profile = build_youtube_profile()
 
     opts = {
         "outtmpl": outtmpl,
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,
-        "extractor_retries": 10,
-        "retries": 10,
-        "fragment_retries": 10,
-        "extractor_args": build_youtube_profile().get("extractor_args", {}),
+        "extractor_retries": 15,
+        "retries": 15,
+        "fragment_retries": 15,
+        "extractor_args": profile.get("extractor_args", {}),
         "ignoreerrors": False,
         "no_color": True,
         "geo_bypass": True,
         "nocheckcertificate": True,
         "concurrent_fragment_downloads": 5,
+        "socket_timeout": 30,
         # Browser impersonation (Requires recent yt-dlp)
-        "impersonate": "chrome", 
         "user_agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         ),
         "http_headers": {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-            "Sec-Fetch-Mode": "navigate",
+            "Accept-Language": "en-US,en;q=0.9",
         },
     }
 
-    # Cookie faqat mavjud va yaroqli bo'lganda qo'shiladi
+    # Cookie faqat mavjud bo'lganda
     if cookie_path:
         opts["cookiefile"] = cookie_path
-    else:
-        # Cookie bo'lmasa, ios clientga ko'proq ishonamiz
-        opts["extractor_args"]["youtube"]["player_client"] = ["ios", "android"]
 
     if audio_only:
         opts.update({
