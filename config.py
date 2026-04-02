@@ -21,6 +21,9 @@ YOUTUBE_PO_TOKEN = os.getenv("YOUTUBE_PO_TOKEN")
 YOUTUBE_VISITOR_DATA = os.getenv("YOUTUBE_VISITOR_DATA")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
+# Web App
+WEB_APP_URL = os.getenv("WEB_APP_URL", "http://localhost:7860/webapp")
+
 # Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")

@@ -6,7 +6,7 @@ import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import BotCommand, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
+from aiogram.types import BotCommand, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
 from urllib.parse import quote_plus, unquote_plus
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
@@ -31,6 +31,7 @@ def main_menu():
     builder.add(KeyboardButton(text="📄 Word<->Pdf"))
     builder.add(KeyboardButton(text="🎤 Artistlar"))
     builder.add(KeyboardButton(text="🆘 Help"))
+    builder.add(KeyboardButton(text="🚀 Appni ochish", web_app=WebAppInfo(url=config.WEB_APP_URL)))
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 
@@ -459,13 +460,20 @@ async def inline_search(query: types.InlineQuery):
     
     await query.answer(results[:50], cache_time=300)
 
-# --- Health check server for Hugging Face ---
+# --- Health check and Web App server ---
 async def handle_health(request):
     return web.Response(text="Bot is running!")
+
+async def handle_webapp(request):
+    html_path = os.path.join(os.path.dirname(__file__), "webapp", "index.html")
+    if not os.path.exists(html_path):
+        return web.Response(status=404, text="Web App not found.")
+    return web.FileResponse(html_path)
 
 async def start_health_server():
     app = web.Application()
     app.router.add_get("/", handle_health)
+    app.router.add_get("/webapp", handle_webapp)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 7860))
