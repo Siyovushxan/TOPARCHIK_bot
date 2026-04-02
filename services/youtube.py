@@ -45,7 +45,8 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """yt-dlp uchun YouTube extractor argumentlari."""
     youtube_args: dict = {
-        "player_client": ["web"],
+        # Ko'proq mijozlarni qo'shish (web-dan tashqari mobil ilovalar kamroq bloklanadi)
+        "player_client": ["ios", "android", "mweb", "web"],
     }
     if YOUTUBE_PO_TOKEN:
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
@@ -62,15 +63,17 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "noprogress": True,
         "no_warnings": True,
         "extractor_retries": 5,
-        "retries": 3,
+        "retries": 5,
         "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        # "impersonate": "chrome",  <-- Bu ba'zan silent failure'ga sabab bo'lishi mumkin
+        "ignoreerrors": False,
+        "no_color": True,
     }
 
     if audio_only:
         opts.update({
-            "format": "bestaudio/best",
+            # Formatni yumshatamiz: agar m4a topilmasa, istalgan audio
+            "format": "ba[ext=m4a]/ba/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -79,7 +82,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         })
     else:
         opts.update({
-            "format": "bestvideo[height<=720]+bestaudio/best[height<=720]",
+            "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
         })
 
     return opts
@@ -95,6 +98,7 @@ async def search_youtube(query: str, max_results: int = 10):
         "noplaylist": True,
         "cookiefile": cookie_path,
         "no_warnings": True,
+        "extractor_args": build_youtube_profile().get("extractor_args", {}),
     }
 
     def _search():
@@ -125,7 +129,7 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                 _info = ydl.extract_info(url, download=True)
                 final_filename = ydl.prepare_filename(_info)
                 
-                # Check if file has been post-processed to something else (like mp3)
+                # Check for post-processed mp3
                 if audio_only:
                     base_path = os.path.splitext(final_filename)[0]
                     mp3_path = base_path + ".mp3"
@@ -134,8 +138,11 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                 
                 return _info, final_filename
         except Exception as e:
+            msg = str(e)
+            if "format is not available" in msg:
+                msg = "Ushbu audioga ruxsat berilmadi yoki format topilmadi. Iltimos boshqa variantni tanlang."
             logger.error(f"Download error for {url}: {e}")
-            raise Exception(str(e) or "Unknown yt-dlp error")
+            raise Exception(msg)
 
     loop = asyncio.get_event_loop()
     try:
@@ -146,7 +153,6 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     # Backup check for file existence
     if not os.path.exists(final_path):
-        # Maybe it renamed it without our knowledge?
         base_path = os.path.splitext(final_path)[0]
         for ext in ['.mp3', '.m4a', '.webm', '.mp4']:
             if os.path.exists(base_path + ext):
