@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import logging
 import yt_dlp
 from googleapiclient.discovery import build
@@ -86,6 +87,25 @@ def build_youtube_profile() -> dict:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
         
     return {"extractor_args": {"youtube": youtube_args}}
+
+
+def _parse_iso8601_duration(duration: str) -> int:
+    """Convert YouTube ISO 8601 duration to seconds."""
+    if not duration:
+        return 0
+
+    pattern = re.compile(
+        r'^P(?:(?P<days>\d+)D)?(?:T(?:(?P<hours>\d+)H)?(?:(?P<minutes>\d+)M)?(?:(?P<seconds>\d+)S)?)?$'
+    )
+    match = pattern.match(duration)
+    if not match:
+        return 0
+
+    days = int(match.group('days') or 0)
+    hours = int(match.group('hours') or 0)
+    minutes = int(match.group('minutes') or 0)
+    seconds = int(match.group('seconds') or 0)
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
 
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
@@ -214,6 +234,7 @@ async def search_youtube(query: str, max_results: int = 10):
             response = request.execute()
             
             results = []
+            video_ids = []
             for item in response.get("items", []):
                 video_id = item["id"].get("videoId")
                 if video_id:
@@ -221,8 +242,26 @@ async def search_youtube(query: str, max_results: int = 10):
                         "id": video_id,
                         "title": item["snippet"]["title"],
                         "url": f"https://www.youtube.com/watch?v={video_id}",
-                        "duration": 0  # API v3 qidiruvda davomiylikni bermaydi
+                        "duration": 0
                     })
+                    video_ids.append(video_id)
+
+            if video_ids:
+                try:
+                    details_request = youtube.videos().list(
+                        part="contentDetails",
+                        id=','.join(video_ids)
+                    )
+                    details_response = details_request.execute()
+                    duration_map = {
+                        item["id"]: _parse_iso8601_duration(item["contentDetails"]["duration"])
+                        for item in details_response.get("items", [])
+                        if item.get("contentDetails")
+                    }
+                    for res in results:
+                        res["duration"] = duration_map.get(res["id"], 0)
+                except Exception as exc:
+                    logger.warning(f"Could not fetch video durations: {exc}")
             return results
         except Exception as e:
             logger.error(f"YouTube API search error: {e}")
@@ -251,7 +290,21 @@ def _search_yt_dlp_sync(query: str, max_results: int = 10):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
-            return info.get("entries", []) if info else []
+            entries = info.get("entries", []) if info else []
+            results = []
+            for item in entries:
+                if not isinstance(item, dict):
+                    continue
+                video_id = item.get("id")
+                if not video_id and item.get("webpage_url"):
+                    video_id = item["webpage_url"].split("v=")[-1]
+                results.append({
+                    "id": video_id,
+                    "title": item.get("title", "Unknown Title"),
+                    "url": item.get("webpage_url", ""),
+                    "duration": item.get("duration", 0) or 0,
+                })
+            return results
     except Exception as e:
         logger.error(f"yt-dlp search error: {e}")
         return []

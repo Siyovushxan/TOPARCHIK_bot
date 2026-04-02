@@ -103,7 +103,8 @@ async def archive_all_results_task(results):
             archive_msg = await bot.send_audio(
                 chat_id=config.ARCHIVE_CHANNEL, 
                 audio=media_file, 
-                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}"
+                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}",
+                title=info.get('title', '')
             )
             
             # Bazaga yozish
@@ -245,7 +246,8 @@ async def handle_text(message: types.Message, override_text: str = None):
             archive_msg = await bot.send_audio(
                 chat_id=config.ARCHIVE_CHANNEL, 
                 audio=media_file, 
-                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}"
+                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}",
+                title=info.get('title', '')
             )
             archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
             
@@ -282,16 +284,18 @@ async def handle_text(message: types.Message, override_text: str = None):
                 
             response_text = f"<b>🔍 Qidiruv natijasi:</b> {text}\n\n"
             builder = InlineKeyboardBuilder()
+            buttons = []
             
             for i, res in enumerate(results[:10], 1):
                 duration = format_duration(res.get('duration', 0))
                 response_text += f"<b>{i}.</b> {res['title']} {duration}\n"
-                builder.add(InlineKeyboardButton(text=str(i), callback_data=f"dl_{res['id']}"))
-                
-            # Add navigation buttons
+                buttons.append(InlineKeyboardButton(text=str(i), callback_data=f"dl_{res['id']}"))
+
+            if buttons:
+                builder.add(*buttons)
+                builder.adjust(5, 5)
+
             builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
-            
-            builder.adjust(5, 1)
             response_text += PROMO_TEXT
             await message.answer(response_text, reply_markup=builder.as_markup(), parse_mode="HTML")
         else:
@@ -329,7 +333,12 @@ async def process_download(callback: types.CallbackQuery):
         # Cache to Archive
         if config.ARCHIVE_CHANNEL:
             try:
-                archive_msg = await bot.send_audio(chat_id=config.ARCHIVE_CHANNEL, audio=sent_msg.audio.file_id, caption=f"#musiqa {info.get('title', '')}")
+                archive_msg = await bot.send_audio(
+                    chat_id=config.ARCHIVE_CHANNEL,
+                    audio=sent_msg.audio.file_id,
+                    caption=f"#musiqa {info.get('title', '')}",
+                    title=info.get('title', '')
+                )
                 archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
             except Exception as e:
                 logger.error(f"Archive error: {e}")
