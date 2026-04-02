@@ -25,15 +25,29 @@ bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher()
 
 # --- Keyboards ---
+
+def get_web_app_button():
+    """Return a valid WebApp button only for HTTPS URLs."""
+    url = config.WEB_APP_URL.strip()
+    if not url or not url.lower().startswith("https://"):
+        if url:
+            logger.warning("Invalid WEB_APP_URL for Telegram WebApp button: %s. Skipping web app button.", url)
+        return None
+    return KeyboardButton(text="🚀 Appni ochish", web_app=WebAppInfo(url=url))
+
+
 def main_menu():
     builder = ReplyKeyboardBuilder()
     builder.add(KeyboardButton(text="📥 Media"))
     builder.add(KeyboardButton(text="📄 Word<->Pdf"))
     builder.add(KeyboardButton(text="🎤 Artistlar"))
     builder.add(KeyboardButton(text="🆘 Help"))
-    builder.add(KeyboardButton(text="🚀 Appni ochish", web_app=WebAppInfo(url=config.WEB_APP_URL)))
+    web_app_button = get_web_app_button()
+    if web_app_button:
+        builder.add(web_app_button)
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
+
 
 def ad_inline_markup():
     builder = InlineKeyboardBuilder()
