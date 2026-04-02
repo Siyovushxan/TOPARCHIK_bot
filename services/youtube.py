@@ -68,7 +68,7 @@ def build_youtube_profile() -> dict:
     ios va android clientlari serverlarda bloklanish ehtimoli ancha past.
     """
     youtube_args: dict = {
-        "player_client": ["ios", "android", "mweb"], # mweb (mobile web) ham ba'zan yordam beradi
+        "player_client": ["android_music", "ios", "android", "mweb"], # android_music eng barqaror profil
         "force_ipv4": True,
         "include_dash_manifest": False,
         "include_hls_manifest": False,
