@@ -45,8 +45,9 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """yt-dlp uchun YouTube extractor argumentlari."""
     youtube_args: dict = {
-        # Ko'proq mijozlarni qo'shish (web-dan tashqari mobil ilovalar kamroq bloklanadi)
-        "player_client": ["ios", "android", "mweb", "web"],
+        # Mobil mijozlar kamroq bloklanadi, shuning uchun ularni birinchi qo'yamiz
+        "player_client": ["android", "ios", "mweb"],
+        "force_ipv4": True,
     }
     if YOUTUBE_PO_TOKEN:
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
@@ -63,17 +64,18 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "noprogress": True,
         "no_warnings": True,
         "extractor_retries": 5,
-        "retries": 5,
+        "retries": 10,
         "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
         "ignoreerrors": False,
         "no_color": True,
+        "source_address": "0.0.0.0", # IPv4 ni majburlash
     }
 
     if audio_only:
         opts.update({
-            # Formatni yumshatamiz: agar m4a topilmasa, istalgan audio
-            "format": "ba[ext=m4a]/ba/best",
+            # Formatni eng sodda holatga keltiramiz
+            "format": "bestaudio/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
