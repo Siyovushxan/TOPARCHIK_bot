@@ -50,12 +50,12 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """yt-dlp uchun YouTube extractor argumentlari."""
     youtube_args: dict = {
-        # 'web' client odatda po_token bilan yaxshi ishlaydi
-        "player_client": ["web_creator", "mweb", "android", "ios", "web"],
+        # 'ios' va 'web_creator' hozirda eng barqaror mijozlar
+        "player_client": ["ios", "web_creator", "mweb", "android", "web"],
         "force_ipv4": True,
     }
     if YOUTUBE_PO_TOKEN:
-        # web.gvs+ formati ko'pincha web client uchun kerak
+        # web.gvs+ prefixini faqat web mijozlari uchun emas, universal qo'llash
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
