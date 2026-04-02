@@ -55,7 +55,7 @@ def build_youtube_profile() -> dict:
 
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
-    """yt-dlp uchun parametrlar. curl-cffi orqali Chrome sifatida ko'rinamiz."""
+    """yt-dlp uchun parametrlar."""
     opts = {
         "outtmpl": outtmpl,
         "quiet": True,
@@ -65,7 +65,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "retries": 3,
         "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        "impersonate": "chrome",  # curl-cffi: bot emas, Chrome brauzer sifatida
+        # "impersonate": "chrome",  <-- Bu ba'zan silent failure'ga sabab bo'lishi mumkin
     }
 
     if audio_only:
@@ -98,13 +98,13 @@ async def search_youtube(query: str, max_results: int = 10):
     }
 
     def _search():
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
                 return info.get("entries", []) if info else []
-            except Exception as e:
-                logger.error(f"yt-dlp search error: {e}")
-                return []
+        except Exception as e:
+            logger.error(f"yt-dlp search error: {e}")
+            return []
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _search)
@@ -120,8 +120,8 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
     opts = get_yt_dlp_opts(outtmpl, audio_only)
 
     def _download():
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            try:
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
                 _info = ydl.extract_info(url, download=True)
                 final_filename = ydl.prepare_filename(_info)
                 
@@ -133,12 +133,16 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                         return _info, mp3_path
                 
                 return _info, final_filename
-            except Exception as e:
-                logger.error(f"Download error for {url}: {e}")
-                raise Exception(f"Download failed: {str(e)[:200]}")
+        except Exception as e:
+            logger.error(f"Download error for {url}: {e}")
+            raise Exception(str(e) or "Unknown yt-dlp error")
 
     loop = asyncio.get_event_loop()
-    info, final_path = await loop.run_in_executor(None, _download)
+    try:
+        info, final_path = await loop.run_in_executor(None, _download)
+    except Exception as e:
+        logger.error(f"Executor error: {e}")
+        raise e
 
     # Backup check for file existence
     if not os.path.exists(final_path):
