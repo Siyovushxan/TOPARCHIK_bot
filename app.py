@@ -12,7 +12,6 @@ import config
 from services.gemini import ask_gemini
 from services.youtube import search_youtube, download_media
 from services.archive import archive_service
-from services.whisper import transcribe_audio
 from services.docs import convert_pdf_to_docx, run_conversion
 
 # Logging setup
@@ -28,7 +27,6 @@ def main_menu():
     builder = ReplyKeyboardBuilder()
     builder.add(KeyboardButton(text="📥 Media"))
     builder.add(KeyboardButton(text="📄 Word<->Pdf"))
-    builder.add(KeyboardButton(text="🎙 Ovozli Tahlil"))
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 
@@ -43,10 +41,9 @@ def ad_inline_markup():
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "👋 **Toparchik AI Universal Bot (v2.0)** ga xush kelibsiz!\n\n"
-        "Men sizga media yuklash, hujjatlarni aylantirish va ovozli xabarlarni tahlil qilishda yordam beraman.",
+        WELCOME_TEXT,
         reply_markup=main_menu(),
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 @dp.message(F.text.in_({"Musiqa qidirish", "AI savol-javob", "PPT yaratish", "Word yaratish", "Asosiy menyu", "📄 Hujjatlar"}))
@@ -61,20 +58,22 @@ async def old_menu_handler(message: types.Message):
 BOT_LINK = "@toparchik_bot"
 PROMO_TEXT = f"\n\n🔥 <i>Eng sara musiqalar va aqlli AI xizmatlari faqat bizda: {BOT_LINK}</i>"
 WELCOME_TEXT = (
-    "<b>👋 Xush kelibsiz! Men TOPARCHIK AI Universal Botman.</b>\n\n"
-    "✨ <b>Asosiy imkoniyatlarim:</b>\n"
-    "🎵 <b>Musiqa:</b> Dunyo bo'ylab istalgan qo'shiqni topish.\n"
-    "📹 <b>Video:</b> Ijtimoiy tarmoqlardan (YT, IG, TT) media yuklash.\n"
-    "🔄 <b>Konvertatsiya:</b> PDF <-> Word fayllarni aylantirish.\n"
-    "🎙 <b>AI Tahlil:</b> Ovozli xabarlarni matnga o'girish (tez orada).\n\n"
-    "⚡️ <i>Quyidagi menyu orqali botni boshqarishingiz mumkin:</i>" + PROMO_TEXT
+    "<b>👋 Xush kelibsiz!</b>\n\n"
+    "Toparchik AI Universal Bot sizga quyidagi xizmatlarni tez va qulay taqdim etadi:\n"
+    "• <b>Media yuklash:</b> YouTube, Instagram, TikTok linklaridan audio/video olish.\n"
+    "• <b>Hujjat konvertatsiyasi:</b> PDF ↔ Word.\n"
+    "• <b>AI yordamchi:</b> savolingizga aqlli javoblar.\n\n"
+    "<b>Qanday boshlash kerak?</b>\n"
+    "1️⃣ Quyidagi menyudan kerakli bo‘limni tanlang.\n"
+    "2️⃣ Link, matn, yoki fayl yuboring.\n"
+    "3️⃣ Bot sizga natijani tezda yetkazadi.\n\n"
+    "<i>Botni sinab ko‘rish uchun /help ni bosing yoki o‘ng pastdagi menyudan tanlang.</i>" + PROMO_TEXT
 )
 HELP_TEXT = (
     "<b>🆘 Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
     "1️⃣ <b>Musiqa topish:</b> Shunchaki nomi yoki ijrochini yozing.\n"
     "2️⃣ <b>Link orqali yuklash:</b> Video havolasini (link) yuboring.\n"
-    "3️⃣ <b>Voice (ovoz):</b> Ovozli xabar yuborsangiz, tahlil qilib beraman.\n"
-    "4️⃣ <b>Fayllar:</b> .docx yoki PDF fayllarni yuboring.\n\n"
+    "3️⃣ <b>Fayllar:</b> .docx yoki PDF fayllarni yuboring.\n\n"
     "💎 <i>Botimiz 24/7 xizmatingizda!</i>" + PROMO_TEXT
 )
 
@@ -151,25 +150,7 @@ async def docs_menu(message: types.Message):
         parse_mode="HTML"
     )
 
-@dp.message(F.text == "🎙 Ovozli Tahlil")
-async def voice_menu(message: types.Message):
-    await message.answer(
-        "<b>🎙 Ovozli tahlil (AI Transcription):</b>\n\n"
-        "Bu bo'lim orqali siz yuborgan ovozli xabarlarni matnga aylantirib, uning mazmunini AI orqali tahlil qilish mumkin.\n\n"
-        "🚀 <i>Ushbu funksiya hozirda sinov rejimida va tez orada to'liq ishga tushadi!</i>" + PROMO_TEXT,
-        parse_mode="HTML"
-    )
-
 # --- Universal Input Handler ---
-
-@dp.message(F.voice)
-async def handle_voice(message: types.Message):
-    await message.answer(
-        "🎙 <b>Ovozli tahlil bo'limi:</b>\n\n"
-        "Tez orada ushbu bo'lim ishga tushadi! Kelajakda botimiz orqali qo'shiqni ovoz orqali ham izlashingiz mumkin bo'ladi.\n\n"
-        "🚀 <i>Botimiz rivojlanishi uchun yaqinlaringizga ham taklif qiling!</i>" + PROMO_TEXT,
-        parse_mode="HTML"
-    )
 
 @dp.message(F.document)
 async def handle_document(message: types.Message):
