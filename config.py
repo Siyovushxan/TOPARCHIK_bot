@@ -1,7 +1,9 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(Path(BASE_DIR) / ".env")
 
 # Telegram Bot API
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -25,7 +27,6 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 WEB_APP_URL = os.getenv("WEB_APP_URL", "")
 
 # Directories
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 CACHE_FILE = os.path.join(BASE_DIR, "cache_index.json")
 
