@@ -106,8 +106,14 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "no_color": True,
         "geo_bypass": True,
         "nocheckcertificate": True,
-        "concurrent_fragment_downloads": 5,
+        "concurrent_fragment_downloads": 10,  # Tezlikni oshirish uchun
         "socket_timeout": 30,
+        "postprocessor_args": {
+            "ffmpeg": [
+                "-threads", "0",        # Barcha CPU yadrolaridan foydalanish
+                "-preset", "veryfast"   # Tezkor konvertatsiya
+            ]
+        },
         # Browser impersonation (Requires recent yt-dlp)
         "user_agent": (
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
@@ -138,6 +144,56 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         })
 
     return opts
+
+
+async def compress_audio(input_path: str, target_size_mb: int = 49):
+    """Faylni 50 MB dan kichik qilish uchun siqish."""
+    import subprocess
+    
+    current_size = os.path.getsize(input_path) / (1024 * 1024)
+    if current_size <= target_size_mb:
+        return input_path
+
+    logger.info(f"Fayl hajmi {current_size:.1f} MB. Siqish boshlandi...")
+    
+    # Videoning davomiyligini aniqlash (ffprobe orqali)
+    try:
+        cmd = [
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', input_path
+        ]
+        duration = float(subprocess.check_output(cmd).decode().strip())
+    except Exception as e:
+        logger.error(f"Ffprobe error: {e}")
+        duration = 300 # 5 min fallback
+        
+    # Bitrate hisoblash (Hajm = Bitrate * Davomiylik)
+    # 49MB * 8192 (bits per MB) / duration
+    target_bitrate = int((target_size_mb * 8192) / duration)
+    
+    # Bitrate juda past bo'lib ketmasligi kerak (minim 32k)
+    target_bitrate = max(32, min(target_bitrate, 128))
+    
+    output_path = input_path.replace(".mp3", "_fixed.mp3")
+    
+    try:
+        # Ffmpeg orqali siqish
+        compress_cmd = [
+            'ffmpeg', '-y', '-i', input_path,
+            '-b:a', f'{target_bitrate}k',
+            '-map_metadata', '0',
+            '-threads', '0',
+            output_path
+        ]
+        subprocess.run(compress_cmd, check=True, capture_output=True)
+        
+        if os.path.exists(output_path):
+            os.remove(input_path)
+            return output_path
+    except Exception as e:
+        logger.error(f"Compression failed: {e}")
+        
+    return input_path
 
 
 async def search_youtube(query: str, max_results: int = 10):
@@ -209,6 +265,13 @@ async def _search_yt_dlp(query: str, max_results: int = 10):
 
 async def download_media(url: str, chat_id: int, audio_only: bool = True):
     """Media (YouTube, TikTok, Instagram) yuklab olish."""
+    import re
+    
+    # URL ni tozalab olish (agar matn aralash bo'lsa)
+    url_match = re.search(r'(https?://[^\s\a\b]+)', url)
+    if url_match:
+        url = url_match.group(1).replace("\\n", "").strip()
+    
     file_id = f"{chat_id}_{int(asyncio.get_event_loop().time())}"
     file_path = os.path.join(DOWNLOAD_DIR, file_id)
     outtmpl = f"{file_path}.%(ext)s"
@@ -254,5 +317,9 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     if not os.path.exists(final_path):
         raise Exception("Fayl yuklandi, lekin saqlashda xato yuz berdi (topilmadi).")
+
+    # 50 MB limitini tekshirish (faqat audio bo'lsa)
+    if audio_only and os.path.exists(final_path):
+        final_path = await compress_audio(final_path)
 
     return info, final_path
