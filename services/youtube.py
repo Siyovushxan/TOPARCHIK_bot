@@ -27,12 +27,17 @@ def get_cookies_path():
     # Agar Netscape cookie mazmuni bo'lsa
     if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
         cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-        # Har doim qaytadan yozish o'rniga, mavjud bo'lsa va hajmi bir xil bo'lsa — qaytadan yozmaymiz
-        if os.path.exists(cookie_path) and os.path.getsize(cookie_path) == len(raw):
-             return cookie_path
-             
+        
+        # Header qo'shish (agar yo'q bo'lsa)
         if not raw.startswith("# Netscape"):
             raw = "# Netscape HTTP Cookie File\n" + raw
+
+        # Har doim qaytadan yozish o'rniga, mavjud bo'lsa va hajmi bir xil bo'lsa — qaytadan yozmaymiz
+        if os.path.exists(cookie_path):
+            with open(cookie_path, "r", encoding="utf-8") as f:
+                if f.read() == raw:
+                    return cookie_path
+             
         with open(cookie_path, "w", encoding="utf-8") as f:
             f.write(raw)
         logger.info(f"Cookie yozildi: {cookie_path} ({len(raw)} bayt)")
@@ -45,11 +50,12 @@ def get_cookies_path():
 def build_youtube_profile() -> dict:
     """yt-dlp uchun YouTube extractor argumentlari."""
     youtube_args: dict = {
-        # Mobil mijozlar kamroq bloklanadi, shuning uchun ularni birinchi qo'yamiz
-        "player_client": ["android", "ios", "mweb"],
+        # 'web' client odatda po_token bilan yaxshi ishlaydi
+        "player_client": ["web_creator", "mweb", "android", "ios", "web"],
         "force_ipv4": True,
     }
     if YOUTUBE_PO_TOKEN:
+        # web.gvs+ formati ko'pincha web client uchun kerak
         youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
@@ -63,13 +69,23 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,
-        "extractor_retries": 5,
+        "extractor_retries": 10,
         "retries": 10,
         "cookiefile": get_cookies_path(),
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
         "ignoreerrors": False,
         "no_color": True,
         "source_address": "0.0.0.0", # IPv4 ni majburlash
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "http_headers": {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Sec-Fetch-Mode": "navigate",
+        },
+        "concurrent_fragment_downloads": 5,
+        "external_downloader": "ffmpeg",
+        "geo_bypass": True,
+        "nocheckcertificate": True,
     }
 
     if audio_only:
@@ -101,6 +117,7 @@ async def search_youtube(query: str, max_results: int = 10):
         "cookiefile": cookie_path,
         "no_warnings": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     }
 
     def _search():
