@@ -61,19 +61,21 @@ async def old_menu_handler(message: types.Message):
 BOT_LINK = "@toparchik_bot"
 PROMO_TEXT = f"\n\n🔥 <i>Eng sara musiqalar va aqlli AI xizmatlari faqat bizda: {BOT_LINK}</i>"
 WELCOME_TEXT = (
-    "<b>👋 Salom! Men TOPARCHIK AI botman.</b>\n\n"
-    "🎵 <b>Musiqa qidirish:</b> Shunchaki nomi yoki ijrochini yozing.\n"
-    "📹 <b>Video yuklash:</b> YouTube, Instagram yoki TikTok havolasini yuboring.\n"
-    "📄 <b>Hujjatlar:</b> PDF/Word fayllarni yuboring, ularni o'zaro aylantirib beraman.\n\n"
-    "🚀 <i>Sizga qanday yordam bera olaman?</i>" + PROMO_TEXT
+    "<b>👋 Xush kelibsiz! Men TOPARCHIK AI Universal Botman.</b>\n\n"
+    "✨ <b>Asosiy imkoniyatlarim:</b>\n"
+    "🎵 <b>Musiqa:</b> Dunyo bo'ylab istalgan qo'shiqni topish.\n"
+    "📹 <b>Video:</b> Ijtimoiy tarmoqlardan (YT, IG, TT) media yuklash.\n"
+    "🔄 <b>Konvertatsiya:</b> PDF <-> Word fayllarni aylantirish.\n"
+    "🎙 <b>AI Tahlil:</b> Ovozli xabarlarni matnga o'girish (tez orada).\n\n"
+    "⚡️ <i>Quyidagi menyu orqali botni boshqarishingiz mumkin:</i>" + PROMO_TEXT
 )
 HELP_TEXT = (
     "<b>🆘 Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
-    "1️⃣ Musiqa topish uchun uning nomini yozing.\n"
-    "2️⃣ Ijtimoiy tarmoqlardan video yuklash uchun havolani (link) yuboring.\n"
-    "3️⃣ Voice (ovozli xabar) yuborsangiz, uni matnga aylantirishga harakat qilaman.\n"
-    "4️⃣ .docx faylni PDF-ga yoki PDF-ni Word-ga o'girish imkoniyati bor.\n\n"
-    "💎 <i>Botimiz doim rivojlanib bormoqda!</i>" + PROMO_TEXT
+    "1️⃣ <b>Musiqa topish:</b> Shunchaki nomi yoki ijrochini yozing.\n"
+    "2️⃣ <b>Link orqali yuklash:</b> Video havolasini (link) yuboring.\n"
+    "3️⃣ <b>Voice (ovoz):</b> Ovozli xabar yuborsangiz, tahlil qilib beraman.\n"
+    "4️⃣ <b>Fayllar:</b> .docx yoki PDF fayllarni yuboring.\n\n"
+    "💎 <i>Botimiz 24/7 xizmatingizda!</i>" + PROMO_TEXT
 )
 
 async def archive_all_results_task(results):
@@ -127,35 +129,35 @@ async def command_help_handler(message: Message) -> None:
 
 @dp.message(F.text == "📥 Media")
 async def media_menu(message: types.Message):
-    text = (
-        "<b>📥 Media yuklab olish bo'limi:</b>\n\n"
-        "1️⃣ YouTube videolarni havola (link) orqali yuklash.\n"
-        "2️⃣ Instagram Reels va TikTok videolarini yuklash.\n"
-        "3️⃣ Musiqa nomini yozib qidirish.\n\n"
-        "💡 <i>Shunchaki link yoki qo'shiq nomini yozib yuboring!</i>" + PROMO_TEXT
+    await message.answer(
+        "<b>📥 Media yuklash bo'limi:</b>\n\n"
+        "Siz quyidagi tarmoqlardan video yoki audiolarni yuklab olishingiz mumkin:\n"
+        "• YouTube (Video & Audio)\n"
+        "• Instagram (Reels & Video)\n"
+        "• TikTok (Bez vatermark)\n\n"
+        "💡 <b>Qanday yuklanadi?</b> Shunchaki media havolasini (link) botga yuboring!" + PROMO_TEXT,
+        parse_mode="HTML"
     )
-    await message.answer(text, parse_mode="HTML")
 
 @dp.message(F.text == "📄 Word<->Pdf")
 async def docs_menu(message: types.Message):
-    text = (
-        "<b>📄 Hujjatlarni konvertatsiya qilish bo'limi:</b>\n\n"
-        "1️⃣ .pdf faylingizni Word (.docx) holatiga o'tkazish.\n"
-        "2️⃣ .docx yoki .doc faylingizni PDF holatiga o'tkazish.\n\n"
-        "💡 <i>Buning uchun hujjatni botga fayl ko'rinishida yuboring!</i>" + PROMO_TEXT
+    await message.answer(
+        "<b>📄 Hujjatlarni konvertatsiya qilish:</b>\n\n"
+        "Bot yordamida fayllarni tezkor aylantiring:\n"
+        "✅ <b>PDF to Word:</b> PDF faylni @toparchik_bot ga yuboring.\n"
+        "✅ <b>Word to PDF:</b> .docx faylni botga yuboring.\n\n"
+        "⚠️ <i>Eslatma: Fayllar hajmi 20 MB dan oshmasligi tavsiya etiladi.</i>" + PROMO_TEXT,
+        parse_mode="HTML"
     )
-    await message.answer(text, parse_mode="HTML")
 
 @dp.message(F.text == "🎙 Ovozli Tahlil")
 async def voice_menu(message: types.Message):
-    text = (
-        "<b>🎙 Ovozli tahlil bo'limi:</b>\n\n"
-        "1️⃣ Ovozli xabar yuborib uni matnga o'girishingiz mumkin.\n"
-        "2️⃣ AI orqali ovozli xabarning qisqacha mazmunini olish.\n"
-        "3️⃣ Kelajakda qo'shiqni ovoz orqali topish (Tez kunda).\n\n"
-        "💡 <i>Ovozli xabar (voice) yuboring!</i>" + PROMO_TEXT
+    await message.answer(
+        "<b>🎙 Ovozli tahlil (AI Transcription):</b>\n\n"
+        "Bu bo'lim orqali siz yuborgan ovozli xabarlarni matnga aylantirib, uning mazmunini AI orqali tahlil qilish mumkin.\n\n"
+        "🚀 <i>Ushbu funksiya hozirda sinov rejimida va tez orada to'liq ishga tushadi!</i>" + PROMO_TEXT,
+        parse_mode="HTML"
     )
-    await message.answer(text, parse_mode="HTML")
 
 # --- Universal Input Handler ---
 
