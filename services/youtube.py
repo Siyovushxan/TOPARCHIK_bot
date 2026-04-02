@@ -68,13 +68,24 @@ def build_youtube_profile() -> dict:
     YouTube tomonidan kamroq bloklanadi.
     """
     youtube_args: dict = {
-        "player_client": ["ios", "android"],
+        "player_client": ["ios", "android", "web"],
         "force_ipv4": True,
+        "include_dash_manifest": False,
+        "include_hls_manifest": False,
     }
+    
+    # PO Token va Visitor Data ni formatlash
     if YOUTUBE_PO_TOKEN:
-        youtube_args["po_token"] = [f"web.gvs+{YOUTUBE_PO_TOKEN}"]
+        # Har xil clientlar uchun token formatlari
+        youtube_args["po_token"] = [
+            f"web+{YOUTUBE_PO_TOKEN}",
+            f"ios+{YOUTUBE_PO_TOKEN}",
+            YOUTUBE_PO_TOKEN
+        ]
+    
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
+        
     return {"extractor_args": {"youtube": youtube_args}}
 
 
@@ -89,26 +100,32 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "no_warnings": True,
         "extractor_retries": 10,
         "retries": 10,
+        "fragment_retries": 10,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
         "ignoreerrors": False,
         "no_color": True,
-        "source_address": "0.0.0.0",
+        "geo_bypass": True,
+        "nocheckcertificate": True,
+        "concurrent_fragment_downloads": 5,
+        # Browser impersonation (Requires recent yt-dlp)
+        "impersonate": "chrome", 
         "user_agent": (
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
         ),
         "http_headers": {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
+            "Sec-Fetch-Mode": "navigate",
         },
-        "concurrent_fragment_downloads": 4,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
     }
 
     # Cookie faqat mavjud va yaroqli bo'lganda qo'shiladi
     if cookie_path:
         opts["cookiefile"] = cookie_path
+    else:
+        # Cookie bo'lmasa, ios clientga ko'proq ishonamiz
+        opts["extractor_args"]["youtube"]["player_client"] = ["ios", "android"]
 
     if audio_only:
         opts.update({
@@ -138,10 +155,7 @@ async def search_youtube(query: str, max_results: int = 10):
         "noplaylist": True,
         "no_warnings": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        "user_agent": (
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-        ),
+        "impersonate": "chrome",
     }
 
     if cookie_path:

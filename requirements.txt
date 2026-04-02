@@ -2,8 +2,8 @@ aiogram
 aiohttp
 google-genai
 google-generativeai
-yt-dlp
-curl-cffi
+yt-dlp>=2025.1.15
+curl-cffi>=0.7.0
 python-dotenv
 python-pptx
 python-docx
