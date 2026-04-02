@@ -27,6 +27,10 @@ def get_cookies_path():
     # Agar Netscape cookie mazmuni bo'lsa
     if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
         cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
+        # Har doim qaytadan yozish o'rniga, mavjud bo'lsa va hajmi bir xil bo'lsa — qaytadan yozmaymiz
+        if os.path.exists(cookie_path) and os.path.getsize(cookie_path) == len(raw):
+             return cookie_path
+             
         if not raw.startswith("# Netscape"):
             raw = "# Netscape HTTP Cookie File\n" + raw
         with open(cookie_path, "w", encoding="utf-8") as f:
@@ -56,6 +60,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "outtmpl": outtmpl,
         "quiet": True,
         "noprogress": True,
+        "no_warnings": True,
         "extractor_retries": 5,
         "retries": 3,
         "cookiefile": get_cookies_path(),
@@ -82,13 +87,14 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
 
 async def search_youtube(query: str, max_results: int = 10):
     """YouTube dan asinxron qidirish."""
+    cookie_path = get_cookies_path()
     ydl_opts = {
         "quiet": True,
         "extract_flat": True,
         "default_search": f"ytsearch{max_results}",
         "noplaylist": True,
-        "cookiefile": get_cookies_path(),
-        # Qidiruvda impersonate kerak emas — faqat yuklab olishda
+        "cookiefile": cookie_path,
+        "no_warnings": True,
     }
 
     def _search():
@@ -97,8 +103,8 @@ async def search_youtube(query: str, max_results: int = 10):
                 info = ydl.extract_info(f"ytsearch{max_results}:{query}", download=False)
                 return info.get("entries", []) if info else []
             except Exception as e:
-                logger.error(f"yt-dlp search ichki xato: {type(e).__name__}: {e}")
-                raise
+                logger.error(f"yt-dlp search error: {e}")
+                return []
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _search)
@@ -115,13 +121,35 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     def _download():
         with yt_dlp.YoutubeDL(opts) as ydl:
-            _info = ydl.extract_info(url, download=True)
-            return _info, ydl.prepare_filename(_info)
+            try:
+                _info = ydl.extract_info(url, download=True)
+                final_filename = ydl.prepare_filename(_info)
+                
+                # Check if file has been post-processed to something else (like mp3)
+                if audio_only:
+                    base_path = os.path.splitext(final_filename)[0]
+                    mp3_path = base_path + ".mp3"
+                    if os.path.exists(mp3_path):
+                        return _info, mp3_path
+                
+                return _info, final_filename
+            except Exception as e:
+                logger.error(f"Download error for {url}: {e}")
+                raise Exception(f"Download failed: {str(e)[:200]}")
 
     loop = asyncio.get_event_loop()
     info, final_path = await loop.run_in_executor(None, _download)
 
-    if audio_only and not final_path.endswith(".mp3"):
-        final_path = os.path.splitext(final_path)[0] + ".mp3"
+    # Backup check for file existence
+    if not os.path.exists(final_path):
+        # Maybe it renamed it without our knowledge?
+        base_path = os.path.splitext(final_path)[0]
+        for ext in ['.mp3', '.m4a', '.webm', '.mp4']:
+            if os.path.exists(base_path + ext):
+                final_path = base_path + ext
+                break
+    
+    if not os.path.exists(final_path):
+         raise Exception("Fayl yuklandi, lekin saqlashda xato yuz berdi (topilmadi).")
 
     return info, final_path

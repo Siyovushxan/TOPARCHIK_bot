@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import aiohttp
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile
@@ -313,6 +314,20 @@ async def inline_search(query: types.InlineQuery):
     
     await query.answer(results[:50], cache_time=300)
 
+# --- Health check server for Hugging Face ---
+async def handle_health(request):
+    return web.Response(text="Bot is running!")
+
+async def start_health_server():
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 7860))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info(f"Health check server started on port {port}")
+
 async def main():
     logger.info("Bot v2.0 start polling...")
     if not os.path.exists("downloads"):
@@ -323,6 +338,11 @@ async def main():
         logger.info("Webhook o'chirildi.")
     except Exception as e:
         logger.warning(f"Webhook o'chirishda xato (davom etamiz): {e}")
+
+    # Start health check server
+    await start_health_server()
+    
+    # Start polling
     await dp.start_polling(bot)
 
 
