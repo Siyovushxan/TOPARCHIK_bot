@@ -57,6 +57,74 @@ async def old_menu_handler(message: types.Message):
         reply_markup=types.ReplyKeyboardRemove()
     )
 
+# --- Prompts and Constants ---
+BOT_LINK = "@toparchik_bot"
+PROMO_TEXT = f"\n\n🔥 <i>Eng sara musiqalar va aqlli AI xizmatlari faqat bizda: {BOT_LINK}</i>"
+WELCOME_TEXT = (
+    "<b>👋 Salom! Men TOPARCHIK AI botman.</b>\n\n"
+    "🎵 <b>Musiqa qidirish:</b> Shunchaki nomi yoki ijrochini yozing.\n"
+    "📹 <b>Video yuklash:</b> YouTube, Instagram yoki TikTok havolasini yuboring.\n"
+    "📄 <b>Hujjatlar:</b> PDF/Word fayllarni yuboring, ularni o'zaro aylantirib beraman.\n\n"
+    "🚀 <i>Sizga qanday yordam bera olaman?</i>" + PROMO_TEXT
+)
+HELP_TEXT = (
+    "<b>🆘 Botdan foydalanish bo'yicha qo'llanma:</b>\n\n"
+    "1️⃣ Musiqa topish uchun uning nomini yozing.\n"
+    "2️⃣ Ijtimoiy tarmoqlardan video yuklash uchun havolani (link) yuboring.\n"
+    "3️⃣ Voice (ovozli xabar) yuborsangiz, uni matnga aylantirishga harakat qilaman.\n"
+    "4️⃣ .docx faylni PDF-ga yoki PDF-ni Word-ga o'girish imkoniyati bor.\n\n"
+    "💎 <i>Botimiz doim rivojlanib bormoqda!</i>" + PROMO_TEXT
+)
+
+async def archive_all_results_task(results):
+    """Qidiruv natijalarining barchasini orqa fonda kanalga yuklash va keshga qo'shish."""
+    for res in results:
+        video_id = res['id']
+        # Agar bazada allaqachon bo'lsa, o'tkazib yuboramiz
+        if archive_service.get_cached_file_id(video_id):
+            continue
+            
+        try:
+            logger.info(f"Background archiving: {res['title']}")
+            # Audio yuklash
+            from services.youtube import download_media
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            info, file_path = await download_media(url, 0, audio_only=True)
+            
+            # Kanalga yuborish
+            media_file = FSInputFile(file_path)
+            duration_str = ""
+            if info.get('duration'):
+                mins, secs = divmod(int(info['duration']), 60)
+                duration_str = f" [{mins}:{secs:02d}]"
+                
+            archive_msg = await bot.send_audio(
+                chat_id=config.ARCHIVE_CHANNEL, 
+                audio=media_file, 
+                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}"
+            )
+            
+            # Bazaga yozish
+            archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
+            
+            # Faylni o'chirish
+            if os.path.exists(file_path): os.remove(file_path)
+            
+            # YouTube bloklamasligi uchun kichik pauza
+            await asyncio.sleep(5)
+            
+        except Exception as e:
+            logger.error(f"Background archiving failed for {video_id}: {e}")
+            if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
+
+@dp.message(CommandStart())
+async def command_start_handler(message: Message) -> None:
+    await message.answer(WELCOME_TEXT, parse_mode="HTML")
+
+@dp.message(Command("help"))
+async def command_help_handler(message: Message) -> None:
+    await message.answer(HELP_TEXT, parse_mode="HTML")
+
 @dp.message(F.text == "📥 Media")
 async def media_menu(message: types.Message):
     await message.answer("Siz ijtimoiy tarmoqlardan (YT, TT, IG) video yoki musiqa yuklab olishingiz mumkin. Shunchaki link yoki nomini yozing!")
@@ -71,55 +139,14 @@ async def voice_menu(message: types.Message):
 
 # --- Universal Input Handler ---
 
-@dp.message(F.voice | F.audio)
+@dp.message(F.voice)
 async def handle_voice(message: types.Message):
-    wait_msg = await message.answer("⏳ Ovozli xabar tahlil qilinmoqda...")
-    
-    file_id = message.voice.file_id if message.voice else message.audio.file_id
-    file = await bot.get_file(file_id)
-    file_path = f"downloads/{file_id}.oga"
-    await bot.download_file(file.file_path, file_path)
-    
-    try:
-        # Transcription
-        transcript = await transcribe_audio(file_path)
-        
-        if transcript.startswith("Xatolik:"):
-            await wait_msg.edit_text(f"❌ Transkripsiya paytida xato yuz berdi:\n\n{transcript}")
-            return
-
-        # AI Summary
-        summary = await ask_gemini(f"Ushbu matnni qisqacha tahlil qilib, eng muhim tezislarni ajrat: {transcript}")
-        
-        final_text = f"📝 **Matn:**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
-        
-        # WOW Ad
-        ad_text = (
-            "\n\n---\n"
-            "✨ **Reklama:**\n"
-            "🚀 Bu yerda sizning reklamangiz bo'lishi mumkin! \n"
-            "Yuzlab foydalanuvchilarga biznesingizni ko'rsatmoqchimisiz? Biz bilan bog'laning! 💎"
-        )
-        
-        combined_text = final_text + ad_text
-        if len(combined_text) > 4000:
-            allowed_len = 4000 - len(summary) - len(ad_text) - 50
-            if allowed_len > 100:
-                transcript = transcript[:allowed_len] + "..."
-            else:
-                transcript = "Matn ko'rsatish uchun juda uzun."
-            final_text = f"📝 **Matn (qisqartirilgan):**\n{transcript}\n\n💡 **AI Tahlili:**\n{summary}"
-            combined_text = final_text + ad_text
-
-        await wait_msg.edit_text(combined_text, reply_markup=ad_inline_markup(), parse_mode="Markdown")
-    except Exception as e:
-        logger.error(f"Voice handling failed: {e}")
-        await wait_msg.edit_text(f"❌ Kechirasiz, tahlil paytida xato yuz berdi: {str(e)[:100]}")
-    finally:
-        # Cleanup
-        if os.path.exists(file_path):
-            try: os.remove(file_path)
-            except: pass
+    await message.answer(
+        "🎙 <b>Ovozli tahlil bo'limi:</b>\n\n"
+        "Tez orada ushbu bo'lim ishga tushadi! Kelajakda botimiz orqali qo'shiqni ovoz orqali ham izlashingiz mumkin bo'ladi.\n\n"
+        "🚀 <i>Botimiz rivojlanishi uchun yaqinlaringizga ham taklif qiling!</i>" + PROMO_TEXT,
+        parse_mode="HTML"
+    )
 
 @dp.message(F.document)
 async def handle_document(message: types.Message):
@@ -133,9 +160,10 @@ async def handle_document(message: types.Message):
         await bot.download_file(file.file_path, input_path)
         
         try:
+            from services.docs import convert_pdf_to_docx, run_conversion
             output_path = await run_conversion(convert_pdf_to_docx, input_path)
             doc_file = FSInputFile(output_path)
-            await message.answer_document(doc_file, caption="✅ @toparchik_bot orqali konvertatsiya qilindi!")
+            await message.answer_document(doc_file, caption=f"✅ Word fayl tayyor! {PROMO_TEXT}", parse_mode="HTML")
         except Exception as exc:
             await message.answer(f"❌ Xatolik yuz berdi: {exc}")
         finally:
@@ -153,12 +181,12 @@ async def handle_document(message: types.Message):
         await bot.download_file(file.file_path, input_path)
         
         try:
-            from services.docs import convert_docx_to_pdf
+            from services.docs import convert_docx_to_pdf, run_conversion
             output_path = await run_conversion(convert_docx_to_pdf, input_path)
             pdf_file = FSInputFile(output_path)
-            await message.answer_document(pdf_file, caption="✅ @toparchik_bot orqali konvertatsiya qilindi!")
+            await message.answer_document(pdf_file, caption=f"✅ PDF fayl tayyor! {PROMO_TEXT}", parse_mode="HTML")
         except Exception as exc:
-            await message.answer(f"❌ Xatolik yuz berdi. Word'dan PDF ga o'girish tizimi kompyuterga Word dasturi o'rnatilgan bo'lishini talab qiladi.\n\nXato: {exc}")
+            await message.answer(f"❌ Xatolik yuz berdi: {exc}")
         finally:
             if os.path.exists(input_path): os.remove(input_path)
             if 'output_path' in locals() and os.path.exists(output_path): 
@@ -167,21 +195,36 @@ async def handle_document(message: types.Message):
             await wait_msg.delete()
             
     else:
-        await message.answer("🛑 Faqat PDF yoki Word (.doc, .docx) fayllarni yuboring.")
+        await message.answer("🛑 Faqat PDF yoki Word (.doc, .docx) fayllarni yuboring." + PROMO_TEXT, parse_mode="HTML")
 
 @dp.message()
-async def handle_text(message: types.Message):
+async def handle_text(message: types.Message, override_text: str = None):
     # Detect if it's a link or a search query
-    text = message.text
+    text = override_text if override_text else message.text
     if "youtube.com" in text or "youtu.be" in text or "tiktok.com" in text or "instagram.com" in text:
         wait_msg = await message.answer("⏳ Media yuklab olinmoqda...")
         try:
             info, file_path = await download_media(text, message.chat.id)
             media_file = FSInputFile(file_path)
-            await message.answer_audio(media_file, title=info.get('title', 'Media'), caption="✅ @toparchik_bot orqali yuklandi")
+            
+            duration_str = ""
+            if info.get('duration'):
+                mins, secs = divmod(int(info['duration']), 60)
+                duration_str = f" [{mins}:{secs:02d}]"
+                
+            await message.answer_audio(
+                media_file, 
+                title=info.get('title', 'Media'), 
+                caption=f"✅ {info.get('title', '')}{duration_str}{PROMO_TEXT}",
+                parse_mode="HTML"
+            )
             
             # Cache to Archive
-            archive_msg = await bot.send_audio(chat_id=config.ARCHIVE_CHANNEL, audio=media_file, caption=f"#musiqa {info.get('title', '')}")
+            archive_msg = await bot.send_audio(
+                chat_id=config.ARCHIVE_CHANNEL, 
+                audio=media_file, 
+                caption=f"🎵 {info.get('title', '')}{duration_str}\n\n#musiqa {BOT_LINK}"
+            )
             archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0))
             
         except Exception as exc:
@@ -197,6 +240,8 @@ async def handle_text(message: types.Message):
         if len(results) < 10:
             try:
                 yt_results = await search_youtube(text, max_results=10)
+                # Avtomatik ravishda barcha topilgan qo'shiqlarni backgroundda kanalga yuklash
+                asyncio.create_task(archive_all_results_task(yt_results))
             except Exception as e:
                 logger.error(f"YouTube Search failed: {e}")
                 yt_results = []
@@ -211,27 +256,26 @@ async def handle_text(message: types.Message):
             def format_duration(seconds):
                 if not seconds: return ""
                 mins, secs = divmod(int(seconds), 60)
-                return f"{mins}:{secs:02d}"
+                return f"({mins}:{secs:02d})"
                 
-            response_text = f"🔍 {text}\n\n"
+            response_text = f"<b>🔍 Qidiruv natijasi:</b> {text}\n\n"
             builder = InlineKeyboardBuilder()
             
             for i, res in enumerate(results[:10], 1):
                 duration = format_duration(res.get('duration', 0))
-                response_text += f"{i}. {res['title']} {duration}\n"
+                response_text += f"<b>{i}.</b> {res['title']} {duration}\n"
                 builder.add(InlineKeyboardButton(text=str(i), callback_data=f"dl_{res['id']}"))
                 
             # Add navigation buttons
-            builder.add(InlineKeyboardButton(text="⬅️", callback_data="nav_prev"))
-            builder.add(InlineKeyboardButton(text="❌", callback_data="nav_close"))
-            builder.add(InlineKeyboardButton(text="➡️", callback_data="nav_next"))
+            builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
             
-            builder.adjust(5, 5, 3)
+            builder.adjust(5, 1)
+            response_text += PROMO_TEXT
             await message.answer(response_text, reply_markup=builder.as_markup(), parse_mode="HTML")
         else:
             # AI Chat fallback
             response = await ask_gemini(text)
-            await message.answer(response)
+            await message.answer(response + PROMO_TEXT, parse_mode="HTML")
 
 # --- Download Callback ---
 @dp.callback_query(F.data.startswith("dl_"))
