@@ -125,7 +125,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
 
     if audio_only:
         opts.update({
-            "format": "bestaudio/best",
+            "format": "bestaudio[ext=m4a]/bestaudio/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
