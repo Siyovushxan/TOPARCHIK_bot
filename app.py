@@ -5,7 +5,7 @@ import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
+from aiogram.types import BotCommand, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
 import config
@@ -416,6 +416,12 @@ async def main():
 
     # Start health check server
     await start_health_server()
+
+    # Set bot commands visible in Telegram menu
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Botni ishga tushirish"),
+        BotCommand(command="help", description="Yordam olish")
+    ])
     
     # Start polling
     await dp.start_polling(bot)
