@@ -170,15 +170,14 @@ async def docs_menu(message: types.Message):
 @dp.message(F.text == "🎤 Artistlar")
 async def artist_menu(message: types.Message):
     artists = archive_service.get_all_artists()
+    text = "<b>🎤 Artistlar bo‘limi</b>\n\n"
     if not artists:
-        await message.answer(
-            "🎤 Hozircha artistlar mavjud emas. Iltimos, birinchi qo'shiqni yuklab, keyin qayta urinib ko'ring.",
-            reply_markup=main_menu()
-        )
+        text += "<i>Hozircha artistlar mavjud emas.\nKanalga yangi qo'shiq yuklanganda bu bo'limda chiqadi.</i>\n\n"
+        text += "<b>Namuna uchun:</b> <a href='https://t.me/toparchik_ai'>@toparchik_ai</a> kanaliga qarang."
+        await message.answer(text + PROMO_TEXT, reply_markup=main_menu(), parse_mode="HTML", disable_web_page_preview=False)
         return
 
-    text = "<b>🎤 Artistlar bo‘limi</b>\n\n" \
-           "Quyidagi ijrochilardan birini tanlang:\n\n"
+    text += "Quyidagi ijrochilardan birini tanlang:\n\n"
     builder = InlineKeyboardBuilder()
     for artist in artists:
         builder.add(InlineKeyboardButton(text=artist, callback_data=f"artist_sel_{quote_plus(artist)}"))
@@ -483,8 +482,12 @@ async def nav_unsupported(callback: types.CallbackQuery):
 async def artist_selected(callback: types.CallbackQuery):
     artist = unquote_plus(callback.data.split("_", 1)[1])
     songs = archive_service.get_songs_by_artist(artist)
+    response_text = f"<b>🎶 {artist} qo'shiqlari:</b>\n\n"
     if not songs:
-        await callback.answer("Bu artist uchun qo'shiq topilmadi.", show_alert=True)
+        response_text += "<i>Bu artist uchun hozircha qo'shiq mavjud emas.</i>\n\n"
+        response_text += "<b>Namuna uchun:</b> <a href='https://t.me/toparchik_ai'>@toparchik_ai</a> kanaliga qarang."
+        await callback.message.answer(response_text + PROMO_TEXT, reply_markup=main_menu(), parse_mode="HTML", disable_web_page_preview=False)
+        await callback.answer()
         return
 
     def format_duration(seconds):
@@ -493,7 +496,6 @@ async def artist_selected(callback: types.CallbackQuery):
         mins, secs = divmod(int(seconds), 60)
         return f" ({mins}:{secs:02d})"
 
-    response_text = f"<b>🎶 {artist} qo'shiqlari:</b>\n\n"
     builder = InlineKeyboardBuilder()
     buttons = []
     for i, song in enumerate(songs[:10], 1):
