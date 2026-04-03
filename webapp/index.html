@@ -21,14 +21,14 @@
     .page {
       max-width: 520px;
       margin: 0 auto;
-      padding: 24px 18px 32px;
+      padding: 24px 18px 40px;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .logo {
       width: 56px;
@@ -91,6 +91,12 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      cursor: pointer;
+      transition: transform 0.2s ease, border 0.2s ease;
+    }
+    .item:active {
+      transform: scale(0.98);
+      border-color: rgba(130, 144, 255, 0.6);
     }
     .item-title {
       margin: 0;
@@ -102,18 +108,6 @@
       color: #a6b0e7;
       font-size: 13px;
       line-height: 1.6;
-    }
-    .button {
-      width: 100%;
-      padding: 16px 20px;
-      border-radius: 18px;
-      border: none;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-      background: linear-gradient(135deg, #6e7bff, #8a51ff);
-      margin-top: 18px;
-      box-shadow: 0 18px 40px rgba(77, 84, 255, .28);
     }
     .footer {
       margin-top: 24px;
@@ -133,6 +127,104 @@
       font-size: 13px;
       color: #cbdbff;
     }
+    .hidden { display: none; }
+    .list-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .back-button {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.16);
+      color: #d7ddf8;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .list-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .list-subtitle {
+      margin: 4px 0 0;
+      color: #9aa5da;
+      font-size: 13px;
+    }
+    .list {
+      display: grid;
+      gap: 12px;
+    }
+    .song-card {
+      background: rgba(11, 16, 40, 0.85);
+      border: 1px solid rgba(90, 104, 210, 0.25);
+      border-radius: 18px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+    .song-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .song-meta {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: #98a4dc;
+    }
+    .song-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .play-button {
+      background: linear-gradient(135deg, #6e7bff, #8a51ff);
+      border: none;
+      color: white;
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .play-button[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .player {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(15, 20, 46, 0.92);
+      border: 1px solid rgba(94, 108, 220, 0.25);
+    }
+    .player-title {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .player-meta {
+      margin: 0 0 10px;
+      color: #a5b2eb;
+      font-size: 12px;
+    }
+    audio {
+      width: 100%;
+    }
+    .empty-state {
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px dashed rgba(255,255,255,.18);
+      color: #b9c2ee;
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -140,64 +232,69 @@
     <div class="header">
       <div>
         <p class="title">TOPARCHIK AI</p>
-        <p class="subtitle">Telegram ichidagi alohida media app. Yangilangan kategoriyalar va tezkor eshitish.</p>
+        <p class="subtitle">Telegram ichidagi alohida media app. Kategoriyalar bo'yicha tez topish va eshitish.</p>
       </div>
       <div class="logo">T</div>
     </div>
 
-    <div class="card">
-      <h3>Web App bo‘limlari</h3>
-      <p>Bu sahifa Telegram Web App orqali ochilganda, kanalga yuklangan qo‘shiqlarni kategoriya bo‘yicha tez topasiz: Top yuklanganlar, YouTube, Instagram, TikTok, Janrlar va Artistlar.</p>
+    <div id="section-view">
+      <div class="card">
+        <h3>Web App bo'limlari</h3>
+        <p>Bo'limlardan birini tanlang, keyingi sahifada qo'shiqlar chiqadi va ijro qilish mumkin.</p>
+      </div>
+
+      <p class="section-title">Asosiy bo'limlar</p>
+      <div class="grid" id="section-grid">
+        <div class="item" data-section="top">
+          <p class="item-title">Top yuklanganlar</p>
+          <p class="item-desc">Eng mashhur va tez-tez tinglangan qo'shiqlar.</p>
+        </div>
+        <div class="item" data-section="youtube">
+          <p class="item-title">YouTube</p>
+          <p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
+        </div>
+        <div class="item" data-section="instagram">
+          <p class="item-title">Instagram</p>
+          <p class="item-desc">Instagram Reels va musiqiy kontent bo'limi.</p>
+        </div>
+        <div class="item" data-section="tiktok">
+          <p class="item-title">TikTok</p>
+          <p class="item-desc">TikTokdan olingan eng yangi musiqalar.</p>
+        </div>
+        <div class="item" data-section="genres">
+          <p class="item-title">Janrlar</p>
+          <p class="item-desc">Pop, rap, dance va boshqa janrlar bo'yicha.</p>
+        </div>
+        <div class="item" data-section="artists">
+          <p class="item-title">Artistlar</p>
+          <p class="item-desc">Ijrochilar bo'yicha qo'shiqlarni ko'ring.</p>
+        </div>
+      </div>
     </div>
 
-    <p class="section-title">Asosiy bo‘limlar</p>
-    <div class="grid">
-      <div class="item">
-        <p class="item-title">� Top yuklanganlar</p>
-        <p class="item-desc">Eng mashhur va tez-tez tinglangan qo‘shiqlar.</p>
+    <div id="list-view" class="hidden">
+      <div class="list-header">
+        <button class="back-button" id="backButton">Orqaga</button>
+        <div>
+          <p class="list-title" id="list-title">Bo'lim</p>
+          <p class="list-subtitle" id="list-subtitle">Tanlangan bo'limdagi qo'shiqlar.</p>
+        </div>
       </div>
-      <div class="item">
-        <p class="item-title">📺 YouTube</p>
-        <p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
-      </div>
-      <div class="item">
-        <p class="item-title">📸 Instagram</p>
-        <p class="item-desc">Instagram Reels va musiqiy kontent bo‘limi.</p>
-      </div>
-      <div class="item">
-        <p class="item-title">🎵 TikTok</p>
-        <p class="item-desc">TikTokdan olib kelingan eng yangi musiqalar.</p>
-      </div>
-      <div class="item">
-        <p class="item-title">🎧 Janrlar</p>
-        <p class="item-desc">Pop, rap, dance va ko‘proq janrlar bo‘yicha guruhlash.</p>
-      </div>
-      <div class="item">
-        <p class="item-title">👨‍🎤 Artistlar</p>
-        <p class="item-desc">Kanalga yuklangan qo‘shiqlarni ijrochilar bo‘yicha ko‘rib chiqing.</p>
-      </div>
+      <div id="list-content" class="list"></div>
     </div>
 
-    <div class="card">
-      <h3>Qanday ishlaydi</h3>
-      <p>Pastdagi <strong>Open</strong> tugmasini bosing. Bu sahifa ochilgandan so‘ng siz muayyan bo‘limlar va musiqalarni tanlashingiz mumkin bo‘ladi.</p>
+    <div id="player-card" class="player hidden">
+      <p class="player-title" id="player-title">Ijro</p>
+      <p class="player-meta" id="player-meta"></p>
+      <audio id="audio-player" controls preload="none"></audio>
     </div>
 
-    <button class="button" id="closeButton">Orqaga</button>
     <div class="footer">
       <div class="pill">TOPARCHIK AI</div>
-      <p>Web app Telegram ichida ochildi. Hozirgi bot bilan integratsiyalangan.</p>
+      <p>Web app Telegram ichida ishlayapti.</p>
     </div>
   </div>
-  <script>
-    const closeButton = document.getElementById('closeButton');
-    if (window.Telegram && window.Telegram.WebApp) {
-      const tg = window.Telegram.WebApp;
-      tg.expand();
-      closeButton.addEventListener('click', () => tg.close());
-    } else {
-      closeButton.addEventListener('click', () => window.history.back());
-    }
-  </script>
+
+  <script src="/webapp-static/app.js"></script>
 </body>
 </html>

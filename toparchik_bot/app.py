@@ -555,6 +555,109 @@ async def inline_search(query: types.InlineQuery):
     
     await query.answer(results[:50], cache_time=300)
 
+# --- Web App API ---
+
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def _serialize_song(item: dict) -> dict:
+    if not isinstance(item, dict):
+        return {}
+    return {
+        "id": item.get("id") or "",
+        "title": item.get("title") or "Unknown",
+        "duration": _safe_int(item.get("duration") or 0),
+        "file_id": item.get("file_id"),
+        "artist": item.get("artist") or "",
+        "playable": bool(item.get("file_id")),
+    }
+
+
+def _serialize_song_list(items: list, limit: int = 50) -> list:
+    if not items:
+        return []
+    payload = []
+    for item in items[:limit]:
+        song = _serialize_song(item)
+        if song:
+            payload.append(song)
+    return payload
+
+
+async def handle_api_top(request):
+    limit = _safe_int(request.query.get("limit"), 50)
+    songs = archive_service.get_top_songs(limit=limit)
+    return web.json_response({"items": _serialize_song_list(songs, limit)})
+
+
+async def handle_api_platform(request):
+    platform = request.match_info.get("platform", "").lower()
+    limit = _safe_int(request.query.get("limit"), 50)
+    songs = archive_service.get_top_songs_by_platform(platform, limit=limit)
+    return web.json_response({"items": _serialize_song_list(songs, limit)})
+
+
+async def handle_api_artists(request):
+    artists = archive_service.get_all_artists()
+    return web.json_response({"items": artists})
+
+
+async def handle_api_artist(request):
+    artist = unquote_plus(request.match_info.get("artist", ""))
+    limit = _safe_int(request.query.get("limit"), 50)
+    songs = archive_service.get_songs_by_artist(artist)[:limit]
+    return web.json_response({"items": _serialize_song_list(songs, limit)})
+
+
+async def handle_api_search(request):
+    query = request.query.get("q", "").strip()
+    if not query:
+        return web.json_response({"items": []})
+    results = archive_service.search_cache(query)
+    return web.json_response({"items": _serialize_song_list(results, 50)})
+
+
+async def handle_api_audio(request):
+    file_id = request.match_info.get("file_id")
+    if not file_id:
+        return web.Response(status=400, text="Missing file_id")
+
+    try:
+        file = await bot.get_file(file_id)
+    except Exception as exc:
+        logger.error(f"Audio file lookup failed: {exc}")
+        return web.Response(status=404, text="File not found")
+
+    file_url = f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{file.file_path}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as resp:
+                if resp.status != 200:
+                    logger.error(f"Telegram file fetch failed: {resp.status}")
+                    return web.Response(status=502, text="Upstream error")
+
+                headers = {
+                    "Content-Type": resp.headers.get("Content-Type", "audio/mpeg"),
+                    "Cache-Control": "public, max-age=3600",
+                }
+
+                stream = web.StreamResponse(status=200, headers=headers)
+                await stream.prepare(request)
+
+                async for chunk in resp.content.iter_chunked(65536):
+                    await stream.write(chunk)
+
+                await stream.write_eof()
+                return stream
+    except Exception as exc:
+        logger.error(f"Audio proxy error: {exc}")
+        return web.Response(status=500, text="Audio stream error")
+
 # --- Health check and Web App server ---
 async def handle_health(request):
     return web.Response(text="Bot is running!")
@@ -591,7 +694,18 @@ async def start_health_server():
     app = web.Application()
     app.router.add_get("/", handle_root)
     app.router.add_get("/webapp", handle_root)
+    app.router.add_static(
+        "/webapp-static",
+        os.path.join(os.path.dirname(__file__), "..", "webapp"),
+        show_index=False
+    )
     app.router.add_get("/health", handle_health)
+    app.router.add_get("/api/top", handle_api_top)
+    app.router.add_get("/api/platform/{platform}", handle_api_platform)
+    app.router.add_get("/api/artists", handle_api_artists)
+    app.router.add_get("/api/artist/{artist}", handle_api_artist)
+    app.router.add_get("/api/search", handle_api_search)
+    app.router.add_get("/api/audio/{file_id}", handle_api_audio)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 7860))

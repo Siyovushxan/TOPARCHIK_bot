@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import os
 import re
 import logging
@@ -7,6 +8,7 @@ from googleapiclient.discovery import build
 from toparchik_bot.config import (
     DOWNLOAD_DIR,
     YOUTUBE_COOKIES,
+    YOUTUBE_COOKIES_B64,
     YOUTUBE_COOKIES_PATH,
     YOUTUBE_PO_TOKEN,
     YOUTUBE_VISITOR_DATA,
@@ -19,7 +21,9 @@ logger = logging.getLogger(__name__)
 def get_cookies_path():
     """Cookie faylini tayyorlaydi."""
     raw = None
-    if YOUTUBE_COOKIES:
+    if YOUTUBE_COOKIES_B64:
+        raw = YOUTUBE_COOKIES_B64.strip()
+    elif YOUTUBE_COOKIES:
         raw = YOUTUBE_COOKIES.strip()
     elif YOUTUBE_COOKIES_PATH:
         raw = YOUTUBE_COOKIES_PATH.strip()
@@ -41,6 +45,15 @@ def get_cookies_path():
     if (raw.startswith('"') and raw.endswith('"')) or \
        (raw.startswith("'") and raw.endswith("'")):
         raw = raw[1:-1].strip()
+
+    if YOUTUBE_COOKIES_B64:
+        try:
+            decoded = base64.b64decode(raw, validate=True).decode("utf-8")
+            raw = decoded.strip()
+            logger.info("YOUTUBE_COOKIES_B64 decoded successfully.")
+        except Exception as exc:
+            logger.error(f"YOUTUBE_COOKIES_B64 decode error: {exc}")
+            return None
 
     # Agar fayl yo'li bo'lsa
     if os.path.isfile(raw):
@@ -79,6 +92,12 @@ def get_cookies_path():
 
         logger.info(f"Cookie yozildi: {cookie_path} ({size} bayt)")
         return cookie_path
+
+    if "\n" not in raw and "\t" not in raw:
+        logger.warning(
+            "YOUTUBE_COOKIES noto'g'ri ko'rinadi: secret ichiga fayl nomi emas, "
+            "cookies.txt faylining to'liq matni kirishi kerak."
+        )
 
     logger.warning("YOUTUBE_COOKIES noto'g'ri format — cookie siz urinib ko'riladi.")
     return None
