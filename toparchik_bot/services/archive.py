@@ -3,6 +3,34 @@ import os
 from toparchik_bot.config import CACHE_FILE, ARCHIVE_CHANNEL
 
 class ArchiveService:
+        def get_top_songs(self, limit=10):
+            """Eng ko'p yuklangan (arxivda eng ko'p uchraydigan yoki oxirgi qo'shilgan) qo'shiqlar ro'yxati."""
+            # Agar cache da yuklash soni bo'lsa, shunga qarab saralaymiz, aks holda oxirgi qo'shilganlar
+            # Hozircha oddiy: oxirgi qo'shilganlar (dict insertion order Python 3.7+)
+            songs = [
+                {"id": vid, **data}
+                for vid, data in self.cache.items() if isinstance(data, dict)
+            ]
+            # Agar yuklash soni bo'lsa, shunga qarab saralash mumkin (future)
+            # Hozircha oxirgi qo'shilganlar
+            return list(reversed(songs))[:limit]
+
+        def get_top_songs_by_platform(self, platform, limit=10):
+            """Platforma bo'yicha eng ko'p yuklangan qo'shiqlar (YouTube, TikTok, Instagram)."""
+            platform = platform.lower()
+            songs = []
+            for vid, data in self.cache.items():
+                if not isinstance(data, dict):
+                    continue
+                title = data.get("title", "").lower()
+                # Oddiy heuristika: title yoki id orqali platformani aniqlash
+                if platform == "youtube" and ("youtube" in title or len(vid) == 11):
+                    songs.append({"id": vid, **data})
+                elif platform == "tiktok" and ("tiktok" in title):
+                    songs.append({"id": vid, **data})
+                elif platform == "instagram" and ("instagram" in title):
+                    songs.append({"id": vid, **data})
+            return list(reversed(songs))[:limit]
     def __init__(self):
         self.cache = self._load_cache()
 

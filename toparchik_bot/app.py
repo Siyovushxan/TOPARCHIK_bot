@@ -24,7 +24,19 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher()
 
+
 # --- Keyboards ---
+
+def categories_inline_markup():
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="🔥 Top yuklanganlar", callback_data="cat_top"))
+    builder.add(InlineKeyboardButton(text="📺 YouTube", callback_data="cat_youtube"))
+    builder.add(InlineKeyboardButton(text="🎵 TikTok", callback_data="cat_tiktok"))
+    builder.add(InlineKeyboardButton(text="📸 Instagram", callback_data="cat_instagram"))
+    builder.add(InlineKeyboardButton(text="🎧 Janrlar", callback_data="cat_genre"))
+    builder.add(InlineKeyboardButton(text="👨‍🎤 Artistlar", callback_data="cat_artist"))
+    builder.adjust(2)
+    return builder.as_markup()
 
 def get_web_app_button():
     """Return a valid WebApp button only for HTTPS URLs."""
@@ -55,6 +67,8 @@ def ad_inline_markup():
 
 # --- Handlers ---
 
+
+# --- Start command: show categories ---
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
@@ -62,6 +76,58 @@ async def cmd_start(message: types.Message):
         reply_markup=main_menu(),
         parse_mode="HTML"
     )
+    await message.answer("<b>Asosiy bo‘limlar:</b> Kategoriyani tanlang:", reply_markup=categories_inline_markup(), parse_mode="HTML")
+# --- Category callbacks ---
+def format_song_list(songs, title):
+    def format_duration(seconds):
+        if not seconds: return ""
+        mins, secs = divmod(int(seconds), 60)
+        return f"({mins}:{secs:02d})"
+    text = f"<b>{title}</b>\n\n"
+    builder = InlineKeyboardBuilder()
+    for i, song in enumerate(songs, 1):
+        text += f"<b>{i}.</b> {song.get('title', '')} {format_duration(song.get('duration', 0))}\n"
+        builder.add(InlineKeyboardButton(text=str(i), callback_data=f"dl_{song['id']}"))
+    if songs:
+        builder.adjust(5, 5)
+    builder.add(InlineKeyboardButton(text="⬅️ Orqaga", callback_data="cat_back"))
+    builder.add(InlineKeyboardButton(text="❌ Yopish", callback_data="nav_close"))
+    return text + PROMO_TEXT, builder.as_markup()
+
+@dp.callback_query(F.data == "cat_top")
+async def cat_top_handler(callback: types.CallbackQuery):
+    songs = archive_service.get_top_songs(limit=10)
+    text, markup = format_song_list(songs, "🔥 Top yuklanganlar")
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "cat_youtube")
+async def cat_youtube_handler(callback: types.CallbackQuery):
+    songs = archive_service.get_top_songs_by_platform("youtube", limit=10)
+    text, markup = format_song_list(songs, "📺 YouTube'dan eng ko‘p yuklanganlar")
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "cat_tiktok")
+async def cat_tiktok_handler(callback: types.CallbackQuery):
+    songs = archive_service.get_top_songs_by_platform("tiktok", limit=10)
+    text, markup = format_song_list(songs, "🎵 TikTok'dan eng ko‘p yuklanganlar")
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "cat_instagram")
+async def cat_instagram_handler(callback: types.CallbackQuery):
+    songs = archive_service.get_top_songs_by_platform("instagram", limit=10)
+    text, markup = format_song_list(songs, "📸 Instagram'dan eng ko‘p yuklanganlar")
+    await callback.message.edit_text(text, reply_markup=markup, parse_mode="HTML")
+    await callback.answer()
+
+@dp.callback_query(F.data == "cat_back")
+async def cat_back_handler(callback: types.CallbackQuery):
+    await callback.message.edit_text("<b>Asosiy bo‘limlar:</b> Kategoriyani tanlang:", reply_markup=categories_inline_markup(), parse_mode="HTML")
+    await callback.answer()
+
+# Janrlar va Artistlar uchun eski handlerlar ishlatiladi (ular allaqachon bor)
 
 @dp.message(F.text.in_({"Musiqa qidirish", "AI savol-javob", "PPT yaratish", "Word yaratish", "Asosiy menyu", "📄 Hujjatlar"}))
 async def old_menu_handler(message: types.Message):
