@@ -183,21 +183,12 @@
       <p>Pastdagi <strong>Open</strong> tugmasini bosing. Bu sahifa ochilgandan so‘ng siz muayyan bo‘limlar va musiqalarni tanlashingiz mumkin bo‘ladi.</p>
     </div>
 
-    <button class="button" id="closeButton">Orqaga</button>
+    <!-- Open/Orqaga button olib tashlandi -->
     <div class="footer">
       <div class="pill">TOPARCHIK AI</div>
       <p>Web app Telegram ichida ochildi. Hozirgi bot bilan integratsiyalangan.</p>
     </div>
   </div>
-  <script>
-    const closeButton = document.getElementById('closeButton');
-    if (window.Telegram && window.Telegram.WebApp) {
-      const tg = window.Telegram.WebApp;
-      tg.expand();
-      closeButton.addEventListener('click', () => tg.close());
-    } else {
-      closeButton.addEventListener('click', () => window.history.back());
-    }
-  </script>
+  <!-- Open/Orqaga button script olib tashlandi -->
 </body>
 </html>
