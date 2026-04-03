@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<title>TOPARCHIK AI</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			color: #fff;
+			background: #070b18;
+			font-family: Inter, system-ui, sans-serif;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			min-height: 100vh;
+			background: radial-gradient(circle at top, #2f359d 0%, #090d22 45%, #04060f 100%);
+			color: #f5f7ff;
+		}
+		.page {
+			max-width: 520px;
+			margin: 0 auto;
+			padding: 24px 18px 32px;
+		}
+		.header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 16px;
+			margin-bottom: 28px;
+		}
+		.logo {
+			width: 56px;
+			height: 56px;
+			border-radius: 18px;
+			background: linear-gradient(135deg, #4f5bff, #a750ff);
+			display: grid;
+			place-items: center;
+			font-size: 22px;
+			font-weight: 800;
+			color: white;
+			box-shadow: 0 20px 50px rgba(79, 91, 255, .24);
+		}
+		.title {
+			margin: 0;
+			font-size: 24px;
+			line-height: 1.2;
+		}
+		.subtitle {
+			margin: 6px 0 0;
+			color: #b3b9d8;
+			font-size: 14px;
+			line-height: 1.6;
+		}
+		.card {
+			background: rgba(255,255,255,.08);
+			border: 1px solid rgba(255,255,255,.1);
+			border-radius: 24px;
+			padding: 20px;
+			margin-bottom: 18px;
+			backdrop-filter: blur(18px);
+		}
+		.card h3 {
+			margin: 0 0 10px;
+			font-size: 18px;
+		}
+		.card p {
+			margin: 0;
+			color: #d2d8f8;
+			line-height: 1.7;
+			font-size: 14px;
+		}
+		.section-title {
+			margin: 16px 0 8px;
+			font-size: 16px;
+			font-weight: 700;
+			color: #eef2ff;
+		}
+		.grid {
+			display: grid;
+			gap: 14px;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			margin-top: 18px;
+		}
+		.item {
+			background: rgba(18, 23, 58, 0.95);
+			border: 1px solid rgba(96, 111, 255, .18);
+			border-radius: 20px;
+			padding: 18px;
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+		}
+		.item-title {
+			margin: 0;
+			font-size: 16px;
+			font-weight: 700;
+		}
+		.item-desc {
+			margin: 0;
+			color: #a6b0e7;
+			font-size: 13px;
+			line-height: 1.6;
+		}
+		.button {
+			width: 100%;
+			padding: 16px 20px;
+			border-radius: 18px;
+			border: none;
+			color: white;
+			font-size: 16px;
+			cursor: pointer;
+			background: linear-gradient(135deg, #6e7bff, #8a51ff);
+			margin-top: 18px;
+			box-shadow: 0 18px 40px rgba(77, 84, 255, .28);
+		}
+		.footer {
+			margin-top: 24px;
+			color: #8f9ed8;
+			font-size: 13px;
+			line-height: 1.7;
+			text-align: center;
+		}
+		.pill {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			background: rgba(255,255,255,.1);
+			border: 1px solid rgba(255,255,255,.12);
+			border-radius: 999px;
+			padding: 8px 14px;
+			font-size: 13px;
+			color: #cbdbff;
+		}
+	</style>
+</head>
+<body>
+	<div class="page">
+		<div class="header">
+			<div>
+				<p class="title">TOPARCHIK AI</p>
+				<p class="subtitle">Telegram ichidagi alohida media app. Yangilangan kategoriyalar va tezkor eshitish.</p>
+			</div>
+			<div class="logo">T</div>
+		</div>
+
+		<div class="card">
+			<h3>Web App bo‘limlari</h3>
+			<p>Bu sahifa Telegram Web App orqali ochilganda, kanalga yuklangan qo‘shiqlarni kategoriya bo‘yicha tez topasiz: Top yuklanganlar, YouTube, Instagram, TikTok, Janrlar va Artistlar.</p>
+		</div>
+
+		<p class="section-title">Asosiy bo‘limlar</p>
+		<div class="grid">
+			<div class="item">
+				<p class="item-title">� Top yuklanganlar</p>
+				<p class="item-desc">Eng mashhur va tez-tez tinglangan qo‘shiqlar.</p>
+			</div>
+			<div class="item">
+				<p class="item-title">📺 YouTube</p>
+				<p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
+			</div>
+			<div class="item">
+				<p class="item-title">📸 Instagram</p>
+				<p class="item-desc">Instagram Reels va musiqiy kontent bo‘limi.</p>
+			</div>
+			<div class="item">
+				<p class="item-title">🎵 TikTok</p>
+				<p class="item-desc">TikTokdan olib kelingan eng yangi musiqalar.</p>
+			</div>
+			<div class="item">
+				<p class="item-title">🎧 Janrlar</p>
+				<p class="item-desc">Pop, rap, dance va ko‘proq janrlar bo‘yicha guruhlash.</p>
+			</div>
+			<div class="item">
+				<p class="item-title">👨‍🎤 Artistlar</p>
+				<p class="item-desc">Kanalga yuklangan qo‘shiqlarni ijrochilar bo‘yicha ko‘rib chiqing.</p>
+			</div>
+		</div>
+
+		<div class="card">
+			<h3>Qanday ishlaydi</h3>
+			<p>Pastdagi <strong>Open</strong> tugmasini bosing. Bu sahifa ochilgandan so‘ng siz muayyan bo‘limlar va musiqalarni tanlashingiz mumkin bo‘ladi.</p>
+		</div>
+
+		<!-- Open/Orqaga button olib tashlandi -->
+		<div class="footer">
+			<div class="pill">TOPARCHIK AI</div>
+			<p>Web app Telegram ichida ochildi. Hozirgi bot bilan integratsiyalangan.</p>
+		</div>
+	</div>
+	<!-- Open/Orqaga button script olib tashlandi -->
+</body>
+</html>
