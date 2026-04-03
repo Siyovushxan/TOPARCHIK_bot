@@ -8,16 +8,10 @@ class ArchiveService:
         self.cache = self._load_cache()
 
     def get_top_songs(self, limit=10):
-        """Eng ko'p yuklangan (arxivda eng ko'p uchraydigan yoki oxirgi qo'shilgan) qo'shiqlar ro'yxati."""
-        # Agar cache da yuklash soni bo'lsa, shunga qarab saralaymiz, aks holda oxirgi qo'shilganlar
-        # Hozircha oddiy: oxirgi qo'shilganlar (dict insertion order Python 3.7+)
-        songs = [
-            {"id": vid, **data}
-            for vid, data in self.cache.items() if isinstance(data, dict)
-        ]
-        # Agar yuklash soni bo'lsa, shunga qarab saralash mumkin (future)
-        # Hozircha oxirgi qo'shilganlar
-        return list(reversed(songs))[:limit]
+        """Eng ko'p yuklangan qo'shiqlar ro'yxati (download_count bo'yicha)."""
+        songs = self._as_song_list()
+        songs.sort(key=lambda s: (-s.get("download_count", 0), s.get("title", "")))
+        return songs[:limit]
 
     def get_top_songs_by_platform(self, platform, limit=10):
         """Platforma bo'yicha eng ko'p yuklangan qo'shiqlar (YouTube, TikTok, Instagram)."""
@@ -26,15 +20,26 @@ class ArchiveService:
         for vid, data in self.cache.items():
             if not isinstance(data, dict):
                 continue
+            item_platform = (data.get("platform") or "").lower()
             title = data.get("title", "").lower()
-            # Oddiy heuristika: title yoki id orqali platformani aniqlash
+            if item_platform == platform:
+                songs.append({"id": vid, **data})
+                continue
+            # Fallback heuristics
             if platform == "youtube" and ("youtube" in title or len(vid) == 11):
                 songs.append({"id": vid, **data})
             elif platform == "tiktok" and ("tiktok" in title):
                 songs.append({"id": vid, **data})
             elif platform == "instagram" and ("instagram" in title):
                 songs.append({"id": vid, **data})
-        return list(reversed(songs))[:limit]
+
+        songs.sort(key=lambda s: (-s.get("download_count", 0), s.get("title", "")))
+        return songs[:limit]
+
+    def get_all_songs(self):
+        songs = self._as_song_list()
+        songs.sort(key=lambda s: (-s.get("download_count", 0), s.get("title", "")))
+        return songs
 
     def _load_cache(self):
         if not os.path.exists(CACHE_FILE):
@@ -45,6 +50,32 @@ class ArchiveService:
         except Exception as exc:
             print(f"Archive cache load error: {exc}")
             return {}
+
+    @staticmethod
+    def _default_counts(data: dict) -> dict:
+        download_count = data.get("download_count", 0)
+        play_count = data.get("play_count", 0)
+        try:
+            download_count = int(download_count)
+        except Exception:
+            download_count = 0
+        try:
+            play_count = int(play_count)
+        except Exception:
+            play_count = 0
+        data["download_count"] = download_count
+        data["play_count"] = play_count
+        return data
+
+    def _as_song_list(self):
+        songs = []
+        for vid, data in self.cache.items():
+            if not isinstance(data, dict):
+                continue
+            item = {"id": vid, **data}
+            self._default_counts(item)
+            songs.append(item)
+        return songs
 
     @staticmethod
     def _normalize_artist(artist: str) -> str:
@@ -76,15 +107,22 @@ class ArchiveService:
             return data.get("file_id")
         return data
 
-    def cache_file_info(self, unique_id: str, file_id: str, title: str, duration: float, artist: str = ""):
+    def cache_file_info(self, unique_id: str, file_id: str, title: str, duration: float, artist: str = "", platform: str = ""):
         """Stores the Telegram file_id and metadata in the cache."""
         if not artist:
             artist = self._extract_artist_from_title(title)
+        existing = self.cache.get(unique_id, {}) if isinstance(self.cache.get(unique_id), dict) else {}
+        download_count = existing.get("download_count", 0)
+        play_count = existing.get("play_count", 0)
+        platform_value = platform or existing.get("platform", "")
         self.cache[unique_id] = {
             "file_id": file_id,
             "title": title,
             "duration": duration,
-            "artist": artist.strip()
+            "artist": artist.strip(),
+            "download_count": download_count,
+            "play_count": play_count,
+            "platform": platform_value
         }
         self.save_cache()
 
@@ -102,7 +140,11 @@ class ArchiveService:
                         "id": vid,
                         "title": data.get("title", ""),
                         "duration": data.get("duration", 0),
-                        "file_id": data.get("file_id")
+                        "file_id": data.get("file_id"),
+                        "artist": data.get("artist", ""),
+                        "download_count": data.get("download_count", 0),
+                        "play_count": data.get("play_count", 0),
+                        "platform": data.get("platform", "")
                     })
         return results
 
@@ -115,6 +157,23 @@ class ArchiveService:
                     artists.add(artist)
         return sorted(artists)
 
+    def get_artist_stats(self) -> list:
+        stats = {}
+        for vid, data in self.cache.items():
+            if not isinstance(data, dict):
+                continue
+            artist = data.get("artist") or self._extract_artist_from_title(data.get("title", ""))
+            if not artist:
+                continue
+            artist_key = artist.strip()
+            info = stats.setdefault(artist_key, {"artist": artist_key, "song_count": 0, "total_downloads": 0})
+            info["song_count"] += 1
+            info["total_downloads"] += int(data.get("download_count", 0) or 0)
+
+        result = list(stats.values())
+        result.sort(key=lambda x: (-x.get("total_downloads", 0), x.get("artist", "")))
+        return result
+
     def get_songs_by_artist(self, artist: str) -> list:
         normalized = self._normalize_artist(artist)
         results = []
@@ -126,9 +185,32 @@ class ArchiveService:
                         "id": vid,
                         "title": data.get("title", ""),
                         "duration": data.get("duration", 0),
-                        "file_id": data.get("file_id")
+                        "file_id": data.get("file_id"),
+                        "artist": data.get("artist", ""),
+                        "download_count": data.get("download_count", 0),
+                        "play_count": data.get("play_count", 0),
+                        "platform": data.get("platform", "")
                     })
+        results.sort(key=lambda s: (-s.get("download_count", 0), s.get("title", "")))
         return results
+
+    def increment_download(self, unique_id: str):
+        data = self.cache.get(unique_id)
+        if not isinstance(data, dict):
+            return
+        count = int(data.get("download_count", 0) or 0) + 1
+        data["download_count"] = count
+        self.cache[unique_id] = data
+        self.save_cache()
+
+    def increment_play(self, unique_id: str):
+        data = self.cache.get(unique_id)
+        if not isinstance(data, dict):
+            return
+        count = int(data.get("play_count", 0) or 0) + 1
+        data["play_count"] = count
+        self.cache[unique_id] = data
+        self.save_cache()
 
 # Global instance
 archive_service = ArchiveService()

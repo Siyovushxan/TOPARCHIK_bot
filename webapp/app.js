@@ -3,57 +3,72 @@ const listView = document.getElementById("list-view");
 const listTitle = document.getElementById("list-title");
 const listSubtitle = document.getElementById("list-subtitle");
 const listContent = document.getElementById("list-content");
+const listTools = document.getElementById("list-tools");
 const backButton = document.getElementById("backButton");
 const playerCard = document.getElementById("player-card");
 const playerTitle = document.getElementById("player-title");
 const playerMeta = document.getElementById("player-meta");
 const audioPlayer = document.getElementById("audio-player");
+const prevButton = document.getElementById("prevButton");
+const nextButton = document.getElementById("nextButton");
 
 const sections = {
   top: {
     title: "Top yuklanganlar",
     subtitle: "Eng mashhur va tez-tez tinglangan qo'shiqlar.",
-    endpoint: "/api/top",
+    endpoint: "/api/top?limit=500",
+    type: "songs",
+  },
+  artists: {
+    title: "Artistlar",
+    subtitle: "Eng ko'p yuklangan ijrochilar.",
+    endpoint: "/api/artists",
+    type: "artists",
+  },
+  instagram: {
+    title: "Instagram",
+    subtitle: "Instagram orqali yuklangan kontent.",
+    endpoint: "/api/platform/instagram?limit=500",
     type: "songs",
   },
   youtube: {
     title: "YouTube",
     subtitle: "YouTube orqali yuklangan audio va videolar.",
-    endpoint: "/api/platform/youtube",
-    type: "songs",
-  },
-  instagram: {
-    title: "Instagram",
-    subtitle: "Instagram Reels va musiqiy kontent bo'limi.",
-    endpoint: "/api/platform/instagram",
+    endpoint: "/api/platform/youtube?limit=500",
     type: "songs",
   },
   tiktok: {
     title: "TikTok",
     subtitle: "TikTokdan olingan eng yangi musiqalar.",
-    endpoint: "/api/platform/tiktok",
+    endpoint: "/api/platform/tiktok?limit=500",
     type: "songs",
   },
-  artists: {
-    title: "Artistlar",
-    subtitle: "Ijrochilar ro'yxatini tanlang.",
-    endpoint: "/api/artists",
-    type: "artists",
-  },
-  genres: {
-    title: "Janrlar",
-    subtitle: "Janrni tanlang, shu nom bo'yicha qo'shiqlar chiqadi.",
-    type: "genres",
+  all: {
+    title: "Barchasi",
+    subtitle: "Bot orqali yuklangan barcha qo'shiqlar.",
+    endpoint: "/api/all?limit=2000",
+    type: "all",
   },
 };
 
-const genreList = [
-  { label: "Pop", query: "pop" },
-  { label: "Rap", query: "rap" },
-  { label: "Dance", query: "dance" },
-  { label: "Rock", query: "rock" },
-  { label: "Lofi", query: "lofi" },
-];
+const PIN_STORAGE_KEY = "toparchik_pins";
+let currentList = [];
+let currentIndex = -1;
+let currentSection = null;
+let currentSort = "downloads";
+
+function loadPins() {
+  try {
+    const raw = localStorage.getItem(PIN_STORAGE_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function savePins(pins) {
+  localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pins]));
+}
 
 function showSectionView() {
   listView.classList.add("hidden");
@@ -67,13 +82,11 @@ function showListView() {
 }
 
 function setLoading() {
-  listContent.innerHTML =
-    '<div class="empty-state">Yuklanmoqda...</div>';
+  listContent.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
 }
 
 function setEmpty(message) {
-  listContent.innerHTML =
-    `<div class="empty-state">${message}</div>`;
+  listContent.innerHTML = `<div class="empty-state">${message}</div>`;
 }
 
 function formatDuration(seconds) {
@@ -84,43 +97,147 @@ function formatDuration(seconds) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url);
+async function fetchJSON(url, options = {}) {
+  const response = await fetch(url, options);
   if (!response.ok) {
     throw new Error("Request failed");
   }
   return response.json();
 }
 
-function renderSongs(items) {
+function ensurePlaylist(list, songId) {
+  currentList = Array.isArray(list) ? list : [];
+  currentIndex = currentList.findIndex((song) => song.id === songId);
+}
+
+function updatePlayer(song) {
+  if (!song) return;
+  playerTitle.textContent = song.title || "Ijro";
+  const parts = [];
+  if (song.artist) parts.push(song.artist);
+  if (song.download_count !== undefined) {
+    parts.push(`Yuklash: ${song.download_count}`);
+  }
+  if (song.play_count !== undefined) {
+    parts.push(`Eshitish: ${song.play_count}`);
+  }
+  playerMeta.textContent = parts.join(" • ");
+  playerCard.classList.remove("hidden");
+}
+
+async function playSong(song) {
+  if (!song || !song.file_id) return;
+  ensurePlaylist(currentList, song.id);
+  const src = `/api/audio/${encodeURIComponent(song.file_id)}?t=${Date.now()}`;
+  audioPlayer.src = src;
+  updatePlayer(song);
+  audioPlayer.play().catch(() => {});
+
+  if (song.id) {
+    try {
+      await fetchJSON(`/api/play/${encodeURIComponent(song.id)}`, { method: "POST" });
+      song.play_count = (song.play_count || 0) + 1;
+      if (currentSection === "all" && song.play_count >= 2) {
+        renderSongs(currentList, { showPins: true, sortMode: currentSort });
+      }
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function playSongByIndex(index) {
+  if (index < 0 || index >= currentList.length) return;
+  currentIndex = index;
+  playSong(currentList[index]);
+}
+
+function handlePrev() {
+  if (currentIndex <= 0) return;
+  playSongByIndex(currentIndex - 1);
+}
+
+function handleNext() {
+  if (currentIndex < 0) return;
+  if (currentIndex >= currentList.length - 1) return;
+  playSongByIndex(currentIndex + 1);
+}
+
+function renderSongs(items, options = {}) {
+  const { showPins = false, sortMode = "downloads" } = options;
+  currentSort = sortMode;
   if (!items || items.length === 0) {
     setEmpty("Hozircha qo'shiqlar topilmadi.");
     return;
   }
 
+  const pins = loadPins();
+  let list = [...items];
+
+  if (showPins) {
+    list.sort((a, b) => {
+      const aPinned = pins.has(a.id);
+      const bPinned = pins.has(b.id);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      const aBoost = (a.play_count || 0) >= 2;
+      const bBoost = (b.play_count || 0) >= 2;
+      if (aBoost !== bBoost) return aBoost ? -1 : 1;
+      if (sortMode === "plays") {
+        const diff = (b.play_count || 0) - (a.play_count || 0);
+        if (diff !== 0) return diff;
+      } else if (sortMode === "title") {
+        return (a.title || "").localeCompare(b.title || "");
+      }
+      const diff = (b.download_count || 0) - (a.download_count || 0);
+      if (diff !== 0) return diff;
+      return (a.title || "").localeCompare(b.title || "");
+    });
+  }
+
+  currentList = list;
   listContent.innerHTML = "";
-  items.forEach((song) => {
+
+  list.forEach((song, index) => {
     const card = document.createElement("div");
     card.className = "song-card";
 
     const info = document.createElement("div");
     const title = document.createElement("p");
     title.className = "song-title";
-    title.textContent = song.title || "Unknown";
+    title.textContent = `${index + 1}. ${song.title || "Unknown"}`;
 
     const meta = document.createElement("p");
     meta.className = "song-meta";
     const duration = formatDuration(song.duration);
     const artist = song.artist ? ` • ${song.artist}` : "";
-    meta.textContent = duration ? `${duration}${artist}` : artist;
+    const downloads = ` • Yuklash: ${song.download_count || 0}`;
+    meta.textContent = `${duration || "0:00"}${artist}${downloads}`;
 
     info.appendChild(title);
-    if (meta.textContent) {
-      info.appendChild(meta);
-    }
+    info.appendChild(meta);
 
     const actions = document.createElement("div");
     actions.className = "song-actions";
+
+    if (showPins) {
+      const pinButton = document.createElement("button");
+      pinButton.className = "pin-button";
+      pinButton.textContent = pins.has(song.id) ? "Pin" : "Pin";
+      if (pins.has(song.id)) {
+        pinButton.classList.add("active");
+      }
+      pinButton.addEventListener("click", () => {
+        if (pins.has(song.id)) {
+          pins.delete(song.id);
+        } else {
+          pins.add(song.id);
+        }
+        savePins(pins);
+        renderSongs(list, { showPins: true, sortMode });
+      });
+      actions.appendChild(pinButton);
+    }
+
     const button = document.createElement("button");
     button.className = "play-button";
     button.textContent = song.playable ? "Play" : "N/A";
@@ -141,53 +258,57 @@ function renderArtists(items) {
   }
 
   listContent.innerHTML = "";
-  items.forEach((artist) => {
+  items.forEach((artist, index) => {
     const card = document.createElement("div");
     card.className = "song-card";
     const title = document.createElement("p");
     title.className = "song-title";
-    title.textContent = artist;
+    title.textContent = `${index + 1}. ${artist.artist}`;
+
+    const meta = document.createElement("p");
+    meta.className = "song-meta";
+    meta.textContent = `Qo'shiqlar: ${artist.song_count} • Yuklash: ${artist.total_downloads}`;
     card.appendChild(title);
-    card.addEventListener("click", () => loadArtist(artist));
+    card.appendChild(meta);
+    card.addEventListener("click", () => loadArtist(artist.artist));
     listContent.appendChild(card);
   });
 }
 
-function renderGenres() {
-  listContent.innerHTML = "";
-  genreList.forEach((genre) => {
-    const card = document.createElement("div");
-    card.className = "song-card";
-    const title = document.createElement("p");
-    title.className = "song-title";
-    title.textContent = genre.label;
-    card.appendChild(title);
-    card.addEventListener("click", () => loadGenre(genre));
-    listContent.appendChild(card);
+function buildAllTools() {
+  listTools.innerHTML = "";
+  const select = document.createElement("select");
+  select.innerHTML = `
+    <option value="downloads">Yuklash bo'yicha</option>
+    <option value="plays">Eshitish bo'yicha</option>
+    <option value="title">Nomi bo'yicha</option>
+  `;
+  select.addEventListener("change", () => {
+    renderSongs(currentList, { showPins: true, sortMode: select.value });
   });
+  listTools.appendChild(select);
+  listTools.classList.remove("hidden");
 }
 
-function playSong(song) {
-  if (!song.file_id) return;
-  const src = `/api/audio/${encodeURIComponent(song.file_id)}?t=${Date.now()}`;
-  audioPlayer.src = src;
-  playerTitle.textContent = song.title || "Ijro";
-  playerMeta.textContent = song.artist || "";
-  playerCard.classList.remove("hidden");
-  audioPlayer.play().catch(() => {});
+function hideAllTools() {
+  listTools.classList.add("hidden");
+  listTools.innerHTML = "";
 }
 
 async function loadSection(sectionId) {
   const section = sections[sectionId];
   if (!section) return;
 
+  currentSection = sectionId;
   listTitle.textContent = section.title;
   listSubtitle.textContent = section.subtitle || "";
   showListView();
+  playerCard.classList.add("hidden");
 
-  if (section.type === "genres") {
-    renderGenres();
-    return;
+  if (sectionId === "all") {
+    buildAllTools();
+  } else {
+    hideAllTools();
   }
 
   setLoading();
@@ -196,6 +317,8 @@ async function loadSection(sectionId) {
     const data = await fetchJSON(section.endpoint);
     if (section.type === "artists") {
       renderArtists(data.items || []);
+    } else if (section.type === "all") {
+      renderSongs(data.items || [], { showPins: true, sortMode: "downloads" });
     } else {
       renderSongs(data.items || []);
     }
@@ -208,6 +331,7 @@ async function loadArtist(artist) {
   listTitle.textContent = artist;
   listSubtitle.textContent = "Artist qo'shiqlari";
   setLoading();
+  hideAllTools();
 
   try {
     const data = await fetchJSON(`/api/artist/${encodeURIComponent(artist)}`);
@@ -217,24 +341,14 @@ async function loadArtist(artist) {
   }
 }
 
-async function loadGenre(genre) {
-  listTitle.textContent = genre.label;
-  listSubtitle.textContent = "Janr bo'yicha qo'shiqlar";
-  setLoading();
-
-  try {
-    const data = await fetchJSON(`/api/search?q=${encodeURIComponent(genre.query)}`);
-    renderSongs(data.items || []);
-  } catch (err) {
-    setEmpty("Janr bo'yicha natija topilmadi.");
-  }
-}
-
 document.querySelectorAll("[data-section]").forEach((item) => {
   item.addEventListener("click", () => loadSection(item.dataset.section));
 });
 
 backButton.addEventListener("click", showSectionView);
+prevButton.addEventListener("click", handlePrev);
+nextButton.addEventListener("click", handleNext);
+audioPlayer.addEventListener("ended", handleNext);
 
 if (window.Telegram && window.Telegram.WebApp) {
   window.Telegram.WebApp.ready();

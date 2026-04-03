@@ -157,6 +157,34 @@
       display: grid;
       gap: 12px;
     }
+    .list-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .list-tools select {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.16);
+      color: #e7ecff;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+    .pin-button {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.16);
+      color: #d7ddf8;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .pin-button.active {
+      background: rgba(110, 123, 255, 0.3);
+      border-color: rgba(110, 123, 255, 0.6);
+      color: #f0f3ff;
+    }
     .song-card {
       background: rgba(11, 16, 40, 0.85);
       border: 1px solid rgba(90, 104, 210, 0.25);
@@ -249,25 +277,25 @@
           <p class="item-title">Top yuklanganlar</p>
           <p class="item-desc">Eng mashhur va tez-tez tinglangan qo'shiqlar.</p>
         </div>
-        <div class="item" data-section="youtube">
-          <p class="item-title">YouTube</p>
-          <p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
+        <div class="item" data-section="artists">
+          <p class="item-title">Artistlar</p>
+          <p class="item-desc">Eng ko'p yuklangan ijrochilar va qo'shiqlar.</p>
         </div>
         <div class="item" data-section="instagram">
           <p class="item-title">Instagram</p>
           <p class="item-desc">Instagram Reels va musiqiy kontent bo'limi.</p>
         </div>
+        <div class="item" data-section="youtube">
+          <p class="item-title">YouTube</p>
+          <p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
+        </div>
         <div class="item" data-section="tiktok">
           <p class="item-title">TikTok</p>
           <p class="item-desc">TikTokdan olingan eng yangi musiqalar.</p>
         </div>
-        <div class="item" data-section="genres">
-          <p class="item-title">Janrlar</p>
-          <p class="item-desc">Pop, rap, dance va boshqa janrlar bo'yicha.</p>
-        </div>
-        <div class="item" data-section="artists">
-          <p class="item-title">Artistlar</p>
-          <p class="item-desc">Ijrochilar bo'yicha qo'shiqlarni ko'ring.</p>
+        <div class="item" data-section="all">
+          <p class="item-title">Barchasi</p>
+          <p class="item-desc">Bot orqali yuklangan barcha qo'shiqlar.</p>
         </div>
       </div>
     </div>
@@ -280,13 +308,17 @@
           <p class="list-subtitle" id="list-subtitle">Tanlangan bo'limdagi qo'shiqlar.</p>
         </div>
       </div>
+      <div id="player-card" class="player hidden">
+        <p class="player-title" id="player-title">Ijro</p>
+        <p class="player-meta" id="player-meta"></p>
+        <div class="song-actions">
+          <button class="play-button" id="prevButton">Orqaga</button>
+          <button class="play-button" id="nextButton">Keyingi</button>
+        </div>
+        <audio id="audio-player" controls preload="none"></audio>
+      </div>
+      <div id="list-tools" class="list-tools hidden"></div>
       <div id="list-content" class="list"></div>
-    </div>
-
-    <div id="player-card" class="player hidden">
-      <p class="player-title" id="player-title">Ijro</p>
-      <p class="player-meta" id="player-meta"></p>
-      <audio id="audio-player" controls preload="none"></audio>
     </div>
 
     <div class="footer">

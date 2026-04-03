@@ -73,6 +73,19 @@ def parse_artist_from_title(title: str) -> str:
         return parts[0].strip()
     return ""
 
+
+def detect_platform_from_url(url: str) -> str:
+    if not url:
+        return ""
+    text = url.lower()
+    if "youtu.be" in text or "youtube.com" in text:
+        return "youtube"
+    if "instagram.com" in text:
+        return "instagram"
+    if "tiktok.com" in text:
+        return "tiktok"
+    return ""
+
 WELCOME_TEXT = (
     "<b>✨ TOPARCHIK AI - Universal Media App</b>\n\n"
     "Web App interfeysini ochish uchun pastdagi <b>🚀 Open</b> tugmasini bosing.\n"
@@ -124,7 +137,14 @@ async def archive_all_results_task(results):
             
             # Bazaga yozish
             artist_name = parse_artist_from_title(info.get('title', ''))
-            archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
+            archive_service.cache_file_info(
+                video_id,
+                archive_msg.audio.file_id,
+                info.get('title', ''),
+                info.get('duration', 0),
+                artist_name,
+                platform="youtube"
+            )
             
             # Faylni o'chirish
             if os.path.exists(file_path): os.remove(file_path)
@@ -287,6 +307,7 @@ async def handle_text(message: types.Message, override_text: str = None):
                 file_id = song.get('file_id')
                 if file_id:
                     await message.answer_audio(file_id, caption=f"✅ {song['title']}{PROMO_TEXT}", parse_mode="HTML")
+                    archive_service.increment_download(song.get("id"))
                     return
         # Qo'shiq nomi bo'yicha ham qidirish
         for song in songs:
@@ -294,6 +315,7 @@ async def handle_text(message: types.Message, override_text: str = None):
                 file_id = song.get('file_id')
                 if file_id:
                     await message.answer_audio(file_id, caption=f"✅ {song['title']}{PROMO_TEXT}", parse_mode="HTML")
+                    archive_service.increment_download(song.get("id"))
                     return
 
     # --- Artistlar bo'limi (avvalgi logika) ---
@@ -355,6 +377,7 @@ async def handle_text(message: types.Message, override_text: str = None):
                 caption=f"✅ {info.get('title', '')}{duration_str}{PROMO_TEXT}",
                 parse_mode="HTML"
             )
+            archive_service.increment_download(info.get("id"))
             
             # Cache to Archive
             archive_msg = await bot.send_audio(
@@ -364,7 +387,14 @@ async def handle_text(message: types.Message, override_text: str = None):
                 title=info.get('title', '')
             )
             artist_name = parse_artist_from_title(info.get('title', ''))
-            archive_service.cache_file_info(info['id'], archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
+            archive_service.cache_file_info(
+                info['id'],
+                archive_msg.audio.file_id,
+                info.get('title', ''),
+                info.get('duration', 0),
+                artist_name,
+                platform=detect_platform_from_url(text)
+            )
             
         except Exception as exc:
             await message.answer(f"❌ Media yuklashda xato: {exc}", disable_web_page_preview=True)
@@ -435,6 +465,7 @@ async def process_download(callback: types.CallbackQuery):
 
     if cached_file_id:
         await bot.send_audio(callback.message.chat.id, audio=cached_file_id, caption=caption_text, reply_markup=reply_markup)
+        archive_service.increment_download(video_id)
         await wait_msg.delete()
         return
     
@@ -444,6 +475,7 @@ async def process_download(callback: types.CallbackQuery):
         media_file = FSInputFile(file_path)
         
         sent_msg = await bot.send_audio(callback.message.chat.id, media_file, title=info.get('title', 'Audio'), caption=caption_text, reply_markup=reply_markup)
+        archive_service.increment_download(video_id)
         
         # Cache to Archive
         if config.ARCHIVE_CHANNEL:
@@ -455,7 +487,14 @@ async def process_download(callback: types.CallbackQuery):
                     title=info.get('title', '')
                 )
                 artist_name = parse_artist_from_title(info.get('title', ''))
-                archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), artist_name)
+                archive_service.cache_file_info(
+                    video_id,
+                    archive_msg.audio.file_id,
+                    info.get('title', ''),
+                    info.get('duration', 0),
+                    artist_name,
+                    platform="youtube"
+                )
             except Exception as e:
                 logger.error(f"Archive error: {e}")
                 
@@ -573,6 +612,9 @@ def _serialize_song(item: dict) -> dict:
         "duration": _safe_int(item.get("duration") or 0),
         "file_id": item.get("file_id"),
         "artist": item.get("artist") or "",
+        "download_count": _safe_int(item.get("download_count") or 0),
+        "play_count": _safe_int(item.get("play_count") or 0),
+        "platform": item.get("platform") or "",
         "playable": bool(item.get("file_id")),
     }
 
@@ -589,26 +631,26 @@ def _serialize_song_list(items: list, limit: int = 50) -> list:
 
 
 async def handle_api_top(request):
-    limit = _safe_int(request.query.get("limit"), 50)
+    limit = _safe_int(request.query.get("limit"), 200)
     songs = archive_service.get_top_songs(limit=limit)
     return web.json_response({"items": _serialize_song_list(songs, limit)})
 
 
 async def handle_api_platform(request):
     platform = request.match_info.get("platform", "").lower()
-    limit = _safe_int(request.query.get("limit"), 50)
+    limit = _safe_int(request.query.get("limit"), 200)
     songs = archive_service.get_top_songs_by_platform(platform, limit=limit)
     return web.json_response({"items": _serialize_song_list(songs, limit)})
 
 
 async def handle_api_artists(request):
-    artists = archive_service.get_all_artists()
+    artists = archive_service.get_artist_stats()
     return web.json_response({"items": artists})
 
 
 async def handle_api_artist(request):
     artist = unquote_plus(request.match_info.get("artist", ""))
-    limit = _safe_int(request.query.get("limit"), 50)
+    limit = _safe_int(request.query.get("limit"), 200)
     songs = archive_service.get_songs_by_artist(artist)[:limit]
     return web.json_response({"items": _serialize_song_list(songs, limit)})
 
@@ -618,7 +660,21 @@ async def handle_api_search(request):
     if not query:
         return web.json_response({"items": []})
     results = archive_service.search_cache(query)
-    return web.json_response({"items": _serialize_song_list(results, 50)})
+    return web.json_response({"items": _serialize_song_list(results, 200)})
+
+
+async def handle_api_all(request):
+    limit = _safe_int(request.query.get("limit"), 500)
+    songs = archive_service.get_all_songs()
+    return web.json_response({"items": _serialize_song_list(songs, limit)})
+
+
+async def handle_api_play(request):
+    song_id = request.match_info.get("song_id")
+    if not song_id:
+        return web.Response(status=400, text="Missing song_id")
+    archive_service.increment_play(song_id)
+    return web.json_response({"ok": True})
 
 
 async def handle_api_audio(request):
@@ -701,11 +757,13 @@ async def start_health_server():
     )
     app.router.add_get("/health", handle_health)
     app.router.add_get("/api/top", handle_api_top)
+    app.router.add_get("/api/all", handle_api_all)
     app.router.add_get("/api/platform/{platform}", handle_api_platform)
     app.router.add_get("/api/artists", handle_api_artists)
     app.router.add_get("/api/artist/{artist}", handle_api_artist)
     app.router.add_get("/api/search", handle_api_search)
     app.router.add_get("/api/audio/{file_id}", handle_api_audio)
+    app.router.add_post("/api/play/{song_id}", handle_api_play)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.environ.get("PORT", 7860))
