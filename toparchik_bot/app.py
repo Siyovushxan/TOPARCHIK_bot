@@ -245,6 +245,100 @@ async def handle_document(message: types.Message):
 async def handle_text(message: types.Message, override_text: str = None):
     # Detect if it's a link or a search query
     text = override_text if override_text else message.text
+
+
+    # --- WebApp kategoriyalari uchun ---
+    # 1. Top yuklanganlar
+    if text.strip() == "Top yuklanganlar":
+        songs = archive_service.get_top_songs(limit=10)
+        if not songs:
+            await message.answer("Hozircha top yuklangan qo'shiqlar mavjud emas.")
+            return
+        response = "<b>🎵 Top yuklanganlar:</b>\n\n"
+        for i, song in enumerate(songs, 1):
+            response += f"<b>{i}.</b> {song['title']}\n"
+        response += "\nIstalgan raqamni yuboring (1-10) yoki qo'shiq nomini yozing, ijro etiladi." + PROMO_TEXT
+        # Saqlash uchun kontekst (oddiy variant, global dict)
+        message.bot['last_top_songs'] = songs
+        await message.answer(response, parse_mode="HTML")
+        return
+
+    # 2. YouTube, Instagram, TikTok
+    for platform in ["YouTube", "Instagram", "TikTok"]:
+        if text.strip() == platform:
+            songs = archive_service.get_top_songs_by_platform(platform.lower(), limit=10)
+            if not songs:
+                await message.answer(f"Hozircha {platform} bo'limida qo'shiqlar mavjud emas.")
+                return
+            response = f"<b>🎵 {platform} bo'limi:</b>\n\n"
+            for i, song in enumerate(songs, 1):
+                response += f"<b>{i}.</b> {song['title']}\n"
+            response += "\nIstalgan raqamni yuboring (1-10) yoki qo'shiq nomini yozing, ijro etiladi." + PROMO_TEXT
+            message.bot['last_top_songs'] = songs
+            await message.answer(response, parse_mode="HTML")
+            return
+
+    # 3. Raqam yuborilsa, oxirgi ro'yxatdan audio yuborish
+    if hasattr(message.bot, 'last_top_songs'):
+        songs = message.bot['last_top_songs']
+        if text.isdigit():
+            idx = int(text) - 1
+            if 0 <= idx < len(songs):
+                song = songs[idx]
+                file_id = song.get('file_id')
+                if file_id:
+                    await message.answer_audio(file_id, caption=f"✅ {song['title']}{PROMO_TEXT}", parse_mode="HTML")
+                    return
+        # Qo'shiq nomi bo'yicha ham qidirish
+        for song in songs:
+            if text.strip().lower() in song.get('title', '').lower():
+                file_id = song.get('file_id')
+                if file_id:
+                    await message.answer_audio(file_id, caption=f"✅ {song['title']}{PROMO_TEXT}", parse_mode="HTML")
+                    return
+
+    # --- Artistlar bo'limi (avvalgi logika) ---
+    if text.strip() == "🎤 Artistlar":
+        artists = archive_service.get_all_artists()
+        if not artists:
+            await message.answer(
+                "🎤 Hozircha artistlar mavjud emas. Iltimos, birinchi qo'shiqni yuklab, keyin qayta urinib ko'ring.",
+                reply_markup=main_menu()
+            )
+            return
+
+        response = "<b>🎤 Artistlar bo‘limi</b>\n\nQuyidagi ijrochilardan birini matn sifatida yuboring:\n\n"
+        for artist in artists:
+            response += f"• {artist}\n"
+        response += PROMO_TEXT
+        await message.answer(response, parse_mode="HTML")
+        return
+
+    artists = archive_service.get_all_artists()
+    if text.strip() in artists:
+        songs = archive_service.get_songs_by_artist(text.strip())
+        if not songs:
+            await message.answer("Bu artist uchun qo'shiq topilmadi.")
+            return
+
+        def format_duration(seconds):
+            if not seconds:
+                return ""
+            mins, secs = divmod(int(seconds), 60)
+            return f" ({mins}:{secs:02d})"
+
+        response = f"<b>🎶 {text.strip()} qo'shiqlari:</b>\n\n"
+        for i, song in enumerate(songs[:10], 1):
+            response += f"<b>{i}.</b> {song['title']}{format_duration(song.get('duration', 0))}\n"
+        response += "\nIstalgan raqamni yuboring (1-10) yoki qo'shiq nomini yozing, ijro etiladi." + PROMO_TEXT
+        message.bot['last_top_songs'] = songs[:10]
+        await message.answer(response, parse_mode="HTML")
+        return
+
+    # 3. Qo'shiq raqami yoki nomi yuborilsa, shu artist kontekstida audio yuborish (oddiy variant, state yo'q)
+    # (Agar state kerak bo'lsa, FSM qo'shish mumkin)
+
+    # 4. Standart media va qidiruv logikasi
     if "youtube.com" in text or "youtu.be" in text or "tiktok.com" in text or "instagram.com" in text:
         wait_msg = await message.answer("⏳ Media yuklab olinmoqda...")
         try:
