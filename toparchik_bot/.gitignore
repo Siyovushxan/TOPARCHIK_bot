@@ -1,0 +1,9 @@
+.env
+__pycache__/
+downloads/
+*.pyc
+user_searches.json
+user_searches.json.bak
+.gemini/
+venv/
+.vscode/
