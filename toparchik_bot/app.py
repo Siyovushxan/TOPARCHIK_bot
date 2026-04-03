@@ -464,7 +464,7 @@ async def handle_health(request):
     return web.Response(text="Bot is running!")
 
 async def handle_webapp(request):
-    html_path = os.path.join(os.path.dirname(__file__), "webapp", "index.html")
+    html_path = os.path.join(os.path.dirname(__file__), "..", "webapp", "index.html")
     if os.path.exists(html_path):
         return web.FileResponse(html_path)
 
