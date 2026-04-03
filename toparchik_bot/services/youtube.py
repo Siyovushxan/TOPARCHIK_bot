@@ -16,6 +16,14 @@ from toparchik_bot.config import (
 )
 
 logger = logging.getLogger(__name__)
+_cookie_warning_emitted = False
+
+
+def _warn_once(message: str):
+    global _cookie_warning_emitted
+    if not _cookie_warning_emitted:
+        logger.warning(message)
+        _cookie_warning_emitted = True
 
 
 def get_cookies_path():
@@ -35,9 +43,9 @@ def get_cookies_path():
         return default_cookie_path
 
     if not raw:
-        logger.warning(
-            "YOUTUBE_COOKIES va YOUTUBE_COOKIES_PATH o'rnatilmagan — cookie ishlatilmaydi."
-            " Railway yoki hosting muhitingizga bu qiymatni qo'shing."
+        _warn_once(
+            "YOUTUBE_COOKIES va YOUTUBE_COOKIES_PATH o'rnatilmagan — cookie ishlatilmaydi. "
+            "Railway yoki hosting muhitingizga bu qiymatni qo'shing."
         )
         return None
 
@@ -54,15 +62,34 @@ def get_cookies_path():
         except Exception as exc:
             logger.error(f"YOUTUBE_COOKIES_B64 decode error: {exc}")
             return None
+    else:
+        # If base64 accidentally placed into YOUTUBE_COOKIES, try to decode once.
+        if ("\n" not in raw and "\t" not in raw and len(raw) > 200 and
+                re.fullmatch(r"[A-Za-z0-9+/=]+", raw or "")):
+            try:
+                decoded = base64.b64decode(raw, validate=True).decode("utf-8")
+                if "Netscape" in decoded or ".youtube.com" in decoded:
+                    raw = decoded.strip()
+                    logger.info("YOUTUBE_COOKIES auto-decoded from base64.")
+            except Exception:
+                pass
 
-    # Agar fayl yo'li bo'lsa
-    if os.path.isfile(raw):
-        size = os.path.getsize(raw)
-        if size < 500:
-            logger.error(f"Cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
-            return None
-        logger.info(f"Cookie fayldan o'qildi: {raw} ({size} bayt)")
-        return raw
+    # Agar fayl yo'li bo'lsa (yoki faqat fayl nomi berilgan bo'lsa)
+    candidate_paths = [raw]
+    if raw and not os.path.isabs(raw):
+        candidate_paths.extend([
+            os.path.join(DOWNLOAD_DIR, raw),
+            os.path.join(os.getcwd(), raw)
+        ])
+
+    for candidate in candidate_paths:
+        if os.path.isfile(candidate):
+            size = os.path.getsize(candidate)
+            if size < 500:
+                logger.error(f"Cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
+                return None
+            logger.info(f"Cookie fayldan o'qildi: {candidate} ({size} bayt)")
+            return candidate
 
     # Agar Netscape cookie mazmuni bo'lsa
     if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
@@ -94,12 +121,12 @@ def get_cookies_path():
         return cookie_path
 
     if "\n" not in raw and "\t" not in raw:
-        logger.warning(
+        _warn_once(
             "YOUTUBE_COOKIES noto'g'ri ko'rinadi: secret ichiga fayl nomi emas, "
-            "cookies.txt faylining to'liq matni kirishi kerak."
+            "cookies.txt faylining to'liq matni yoki base64 ko'rinishi kirishi kerak."
         )
 
-    logger.warning("YOUTUBE_COOKIES noto'g'ri format — cookie siz urinib ko'riladi.")
+    _warn_once("YOUTUBE_COOKIES noto'g'ri format — cookie siz urinib ko'riladi.")
     return None
 
 

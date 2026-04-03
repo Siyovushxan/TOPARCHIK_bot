@@ -911,6 +911,11 @@ async def main():
     ])
     
     # Start polling
+    if not config.POLLING_ENABLED:
+        logger.warning("POLLING_ENABLED=0 — polling to'xtatildi (faqat webapp ishlaydi).")
+        await asyncio.Event().wait()
+        return
+
     await dp.start_polling(bot)
 
 

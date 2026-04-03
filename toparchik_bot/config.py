@@ -53,6 +53,9 @@ ARCHIVE_SYNC_GAP = int(os.getenv("ARCHIVE_SYNC_GAP", "200"))
 ARCHIVE_SYNC_DELAY = float(os.getenv("ARCHIVE_SYNC_DELAY", "0.25"))
 ARCHIVE_SYNC_ON_START = os.getenv("ARCHIVE_SYNC_ON_START", "0") == "1"
 
+# Polling control (optional)
+POLLING_ENABLED = os.getenv("POLLING_ENABLED", "1") != "0"
+
 # Directories
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 CACHE_FILE = os.path.join(BASE_DIR, "cache_index.json")
