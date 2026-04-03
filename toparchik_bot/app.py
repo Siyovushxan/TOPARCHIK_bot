@@ -5,6 +5,7 @@ import re
 import aiohttp
 from aiohttp import web
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.filters import Command, CommandStart
 from aiogram.types import BotCommand, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
 from urllib.parse import quote_plus, unquote_plus
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 # Bot initialization
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher()
+sync_lock = asyncio.Lock()
 
 # --- Keyboards ---
 
@@ -86,14 +88,23 @@ def detect_platform_from_url(url: str) -> str:
         return "tiktok"
     return ""
 
+def is_admin(user_id: int | None) -> bool:
+    if not user_id:
+        return False
+    return user_id in config.ADMIN_IDS if config.ADMIN_IDS else False
+
+def _is_message_missing_error(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "message to forward not found" in text or "message_id_invalid" in text or "message not found" in text
+
 WELCOME_TEXT = (
     "<b>✨ TOPARCHIK AI - Universal Media App</b>\n\n"
     "Web App interfeysini ochish uchun pastdagi <b>🚀 Open</b> tugmasini bosing.\n"
-    "Bu sizga Telegram ichida alohida sahifada kanalga yuklangan qo‘shiqlarni, janrlarni, top yo‘llanmalarni va platforma bo‘yicha toifalarni ko‘rish imkonini beradi.\n\n"
+    "Bu sizga Telegram ichida alohida sahifada kanalga yuklangan qo‘shiqlarni, top yo‘llanmalarni va platforma bo‘yicha toifalarni ko‘rish imkonini beradi.\n\n"
     "<b>🎯 Nimalar kutishingiz mumkin:</b>\n"
     "• <b>Top yuklanganlar</b> va eng so‘nggi qo‘shiqlar.\n"
     "• <b>YouTube / Instagram / TikTok</b> bo‘limlari.\n"
-    "• <b>Janrlar</b> va mashhur artistlar.\n"
+    "• <b>Artistlar</b> va <b>Barchasi</b> bo‘limi.\n"
     "• <b>Oddiy, tezkor</b> media va musiqani eshitish imkoniyati.\n\n"
     "<i>Bot ichidan o‘ziga xos app ochiladi, keyin alohida sahifada tinglash va tanlash mumkin.</i>" + PROMO_TEXT
 )
@@ -156,6 +167,90 @@ async def archive_all_results_task(results):
             logger.error(f"Background archiving failed for {video_id}: {e}")
             if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
 
+async def sync_archive_from_channel(notify_chat_id: int | None):
+    archive_chat = config.ARCHIVE_CHANNEL_ID or config.ARCHIVE_CHANNEL
+    sync_chat_id = config.SYNC_CHAT_ID or notify_chat_id
+    if not sync_chat_id:
+        logger.warning("Sync chat ID not configured. Set SYNC_CHAT_ID or trigger from a chat.")
+        return
+
+    max_id = max(1, config.ARCHIVE_SYNC_MAX)
+    gap_limit = max(1, config.ARCHIVE_SYNC_GAP)
+    delay = max(0.05, config.ARCHIVE_SYNC_DELAY)
+    found = 0
+    misses = 0
+
+    async with sync_lock:
+        logger.info(f"Archive sync started up to {max_id} messages...")
+        for message_id in range(1, max_id + 1):
+            try:
+                msg = await bot.forward_message(
+                    chat_id=sync_chat_id,
+                    from_chat_id=archive_chat,
+                    message_id=message_id,
+                    disable_notification=True
+                )
+            except TelegramBadRequest as exc:
+                if _is_message_missing_error(exc):
+                    misses += 1
+                    if misses >= gap_limit:
+                        break
+                    continue
+                logger.warning(f"Forward error at {message_id}: {exc}")
+                misses += 1
+                if misses >= gap_limit:
+                    break
+                continue
+            except TelegramAPIError as exc:
+                logger.warning(f"Telegram API error at {message_id}: {exc}")
+                misses += 1
+                if misses >= gap_limit:
+                    break
+                await asyncio.sleep(1.0)
+                continue
+            except Exception as exc:
+                logger.warning(f"Sync error at {message_id}: {exc}")
+                misses += 1
+                if misses >= gap_limit:
+                    break
+                continue
+
+            misses = 0
+            audio = msg.audio
+            if audio:
+                title = audio.title or audio.file_name or (msg.caption or "").strip()
+                if not title:
+                    title = f"Audio {message_id}"
+                artist = audio.performer or parse_artist_from_title(title)
+                duration = audio.duration or 0
+                platform = detect_platform_from_url(msg.caption or "")
+                unique_id = audio.file_unique_id or f"tg_{message_id}"
+                archive_service.upsert_audio_entry(
+                    unique_id=unique_id,
+                    file_id=audio.file_id,
+                    title=title,
+                    duration=duration,
+                    artist=artist,
+                    platform=platform,
+                    message_id=message_id
+                )
+                found += 1
+
+            try:
+                await bot.delete_message(sync_chat_id, msg.message_id)
+            except Exception:
+                pass
+
+            await asyncio.sleep(delay)
+
+        logger.info(f"Archive sync finished: {found} audio items.")
+
+    if notify_chat_id:
+        try:
+            await bot.send_message(notify_chat_id, f"Sync tugadi: {found} ta audio topildi.")
+        except Exception:
+            pass
+
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     await message.answer(WELCOME_TEXT, reply_markup=main_menu(), parse_mode="HTML")
@@ -163,6 +258,22 @@ async def command_start_handler(message: Message) -> None:
 @dp.message(Command("help"))
 async def command_help_handler(message: Message) -> None:
     await message.answer(HELP_TEXT, parse_mode="HTML")
+
+@dp.message(Command("sync_archive"))
+async def command_sync_archive(message: Message) -> None:
+    if not is_admin(message.from_user.id):
+        await message.answer(
+            "Sync ishlashi uchun ADMIN_IDS muhit o'zgaruvchisiga o'z ID'ingizni yozing.",
+            parse_mode="HTML"
+        )
+        return
+
+    if sync_lock.locked():
+        await message.answer("Sync allaqachon ishlayapti, biroz kuting.")
+        return
+
+    await message.answer("Sync boshlandi. Barchasi bo'limi to'ldirilmoqda...")
+    asyncio.create_task(sync_archive_from_channel(message.chat.id))
 
 @dp.message(F.text == "📥 Media")
 async def media_menu(message: types.Message):
@@ -580,10 +691,14 @@ async def inline_search(query: types.InlineQuery):
     # This assumes the cache stores title/metadata along with file_id
     # For now, we'll implement a simple keyword search in the cache
     results = []
-    for item_id, file_id in archive_service.cache.items():
+    for item_id, data in archive_service.cache.items():
+        file_id = data.get("file_id") if isinstance(data, dict) else data
+        title = data.get("title") if isinstance(data, dict) else item_id
+        if not file_id:
+            continue
         # In a real scenario, we'd store the title in the cache too.
         # Let's assume the unique_id is the title for this simple version.
-        if text.lower() in item_id.lower():
+        if text.lower() in (title or "").lower() or text.lower() in item_id.lower():
             results.append(
                 types.InlineQueryResultCachedAudio(
                     id=item_id,
@@ -784,6 +899,10 @@ async def main():
 
     # Start health check server
     await start_health_server()
+
+    # Optional: auto-sync archive cache on startup
+    if config.ARCHIVE_SYNC_ON_START:
+        asyncio.create_task(sync_archive_from_channel(config.SYNC_CHAT_ID))
 
     # Set bot commands visible in Telegram menu
     await bot.set_my_commands([

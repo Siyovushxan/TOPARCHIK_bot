@@ -6,6 +6,7 @@ from toparchik_bot.config import CACHE_FILE, ARCHIVE_CHANNEL
 class ArchiveService:
     def __init__(self):
         self.cache = self._load_cache()
+        self._normalize_cache()
 
     def get_top_songs(self, limit=10):
         """Eng ko'p yuklangan qo'shiqlar ro'yxati (download_count bo'yicha)."""
@@ -51,6 +52,26 @@ class ArchiveService:
             print(f"Archive cache load error: {exc}")
             return {}
 
+    def _normalize_cache(self):
+        """Convert legacy string entries to dicts so they appear in lists."""
+        changed = False
+        for key, value in list(self.cache.items()):
+            if isinstance(value, str):
+                self.cache[key] = {
+                    "file_id": value,
+                    "title": "",
+                    "duration": 0,
+                    "artist": "",
+                    "download_count": 0,
+                    "play_count": 0,
+                    "platform": ""
+                }
+                changed = True
+            elif isinstance(value, dict):
+                self._default_counts(value)
+        if changed:
+            self.save_cache()
+
     @staticmethod
     def _default_counts(data: dict) -> dict:
         download_count = data.get("download_count", 0)
@@ -70,12 +91,31 @@ class ArchiveService:
     def _as_song_list(self):
         songs = []
         for vid, data in self.cache.items():
-            if not isinstance(data, dict):
-                continue
-            item = {"id": vid, **data}
-            self._default_counts(item)
-            songs.append(item)
+            item = self._coerce_entry(vid, data)
+            if item:
+                songs.append(item)
         return songs
+
+    def _coerce_entry(self, unique_id, data):
+        if isinstance(data, dict):
+            item = {"id": unique_id, **data}
+        elif isinstance(data, str):
+            item = {
+                "id": unique_id,
+                "file_id": data,
+                "title": "",
+                "duration": 0,
+                "artist": "",
+                "download_count": 0,
+                "play_count": 0,
+                "platform": ""
+            }
+        else:
+            return None
+        self._default_counts(item)
+        if not item.get("title"):
+            item["title"] = f"Audio {unique_id}"
+        return item
 
     @staticmethod
     def _normalize_artist(artist: str) -> str:
@@ -125,6 +165,37 @@ class ArchiveService:
             "platform": platform_value
         }
         self.save_cache()
+
+    def _find_key_by_file_id(self, file_id: str):
+        for key, data in self.cache.items():
+            if isinstance(data, dict) and data.get("file_id") == file_id:
+                return key
+            if isinstance(data, str) and data == file_id:
+                return key
+        return None
+
+    def upsert_audio_entry(self, unique_id: str, file_id: str, title: str, duration: float, artist: str = "", platform: str = "", message_id: int | None = None):
+        if not artist:
+            artist = self._extract_artist_from_title(title)
+        existing_key = self._find_key_by_file_id(file_id) or unique_id
+        existing = self.cache.get(existing_key, {}) if isinstance(self.cache.get(existing_key), dict) else {}
+        download_count = existing.get("download_count", 0)
+        play_count = existing.get("play_count", 0)
+        platform_value = platform or existing.get("platform", "")
+        entry = {
+            "file_id": file_id,
+            "title": title,
+            "duration": duration,
+            "artist": artist.strip(),
+            "download_count": download_count,
+            "play_count": play_count,
+            "platform": platform_value
+        }
+        if message_id is not None:
+            entry["message_id"] = message_id
+        self.cache[existing_key] = entry
+        self.save_cache()
+        return existing_key
 
     def search_cache(self, query: str) -> list:
         """Independently search by all keywords in the query to make it 'smart'."""

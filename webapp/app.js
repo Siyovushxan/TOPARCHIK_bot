@@ -7,10 +7,16 @@ const listTools = document.getElementById("list-tools");
 const backButton = document.getElementById("backButton");
 const playerCard = document.getElementById("player-card");
 const playerTitle = document.getElementById("player-title");
+const playerArtist = document.getElementById("player-artist");
 const playerMeta = document.getElementById("player-meta");
+const playerCover = document.getElementById("player-cover");
 const audioPlayer = document.getElementById("audio-player");
 const prevButton = document.getElementById("prevButton");
 const nextButton = document.getElementById("nextButton");
+const playPauseButton = document.getElementById("playPauseButton");
+const seekBar = document.getElementById("seekBar");
+const currentTimeEl = document.getElementById("currentTime");
+const totalTimeEl = document.getElementById("totalTime");
 
 const sections = {
   top: {
@@ -46,7 +52,7 @@ const sections = {
   all: {
     title: "Barchasi",
     subtitle: "Bot orqali yuklangan barcha qo'shiqlar.",
-    endpoint: "/api/all?limit=2000",
+    endpoint: "/api/all?limit=5000",
     type: "all",
   },
 };
@@ -108,13 +114,17 @@ async function fetchJSON(url, options = {}) {
 function ensurePlaylist(list, songId) {
   currentList = Array.isArray(list) ? list : [];
   currentIndex = currentList.findIndex((song) => song.id === songId);
+  if (currentIndex < 0) {
+    currentIndex = 0;
+  }
 }
 
 function updatePlayer(song) {
   if (!song) return;
   playerTitle.textContent = song.title || "Ijro";
+  playerArtist.textContent = song.artist || "Noma'lum ijrochi";
+  playerCover.textContent = (song.artist || song.title || "T").trim().charAt(0).toUpperCase();
   const parts = [];
-  if (song.artist) parts.push(song.artist);
   if (song.download_count !== undefined) {
     parts.push(`Yuklash: ${song.download_count}`);
   }
@@ -122,6 +132,9 @@ function updatePlayer(song) {
     parts.push(`Eshitish: ${song.play_count}`);
   }
   playerMeta.textContent = parts.join(" • ");
+  totalTimeEl.textContent = formatClock(song.duration || audioPlayer.duration || 0);
+  currentTimeEl.textContent = "0:00";
+  seekBar.value = 0;
   playerCard.classList.remove("hidden");
 }
 
@@ -131,7 +144,10 @@ async function playSong(song) {
   const src = `/api/audio/${encodeURIComponent(song.file_id)}?t=${Date.now()}`;
   audioPlayer.src = src;
   updatePlayer(song);
-  audioPlayer.play().catch(() => {});
+  audioPlayer.play().catch(() => {
+    setPlayState(false);
+  });
+  setActiveCard(song.id);
 
   if (song.id) {
     try {
@@ -161,6 +177,36 @@ function handleNext() {
   if (currentIndex < 0) return;
   if (currentIndex >= currentList.length - 1) return;
   playSongByIndex(currentIndex + 1);
+}
+
+function setPlayState(isPlaying) {
+  playPauseButton.textContent = isPlaying ? "Pause" : "Play";
+}
+
+function formatClock(seconds) {
+  const total = Number(seconds || 0);
+  if (!total) return "0:00";
+  const mins = Math.floor(total / 60);
+  const secs = Math.floor(total % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function updateProgress() {
+  const duration = audioPlayer.duration || 0;
+  const current = audioPlayer.currentTime || 0;
+  if (duration > 0) {
+    const percent = Math.min(100, Math.max(0, (current / duration) * 100));
+    seekBar.value = percent;
+    totalTimeEl.textContent = formatClock(duration);
+  }
+  currentTimeEl.textContent = formatClock(current);
+}
+
+function setActiveCard(songId) {
+  document.querySelectorAll(".song-card").forEach((card) => {
+    const isActive = card.dataset.songId === String(songId);
+    card.classList.toggle("is-playing", isActive);
+  });
 }
 
 function renderSongs(items, options = {}) {
@@ -200,21 +246,32 @@ function renderSongs(items, options = {}) {
   list.forEach((song, index) => {
     const card = document.createElement("div");
     card.className = "song-card";
+    card.dataset.songId = song.id;
+
+    const left = document.createElement("div");
+    left.className = "song-left";
+
+    const rank = document.createElement("div");
+    rank.className = "song-rank";
+    rank.textContent = index + 1;
 
     const info = document.createElement("div");
     const title = document.createElement("p");
     title.className = "song-title";
-    title.textContent = `${index + 1}. ${song.title || "Unknown"}`;
+    title.textContent = song.title || "Audio";
 
     const meta = document.createElement("p");
     meta.className = "song-meta";
     const duration = formatDuration(song.duration);
     const artist = song.artist ? ` • ${song.artist}` : "";
     const downloads = ` • Yuklash: ${song.download_count || 0}`;
-    meta.textContent = `${duration || "0:00"}${artist}${downloads}`;
+    const listens = song.play_count ? ` • Eshitish: ${song.play_count}` : "";
+    meta.textContent = `${duration || "0:00"}${artist}${downloads}${listens}`;
 
     info.appendChild(title);
     info.appendChild(meta);
+    left.appendChild(rank);
+    left.appendChild(info);
 
     const actions = document.createElement("div");
     actions.className = "song-actions";
@@ -222,7 +279,7 @@ function renderSongs(items, options = {}) {
     if (showPins) {
       const pinButton = document.createElement("button");
       pinButton.className = "pin-button";
-      pinButton.textContent = pins.has(song.id) ? "Pin" : "Pin";
+      pinButton.textContent = pins.has(song.id) ? "Pinned" : "Pin";
       if (pins.has(song.id)) {
         pinButton.classList.add("active");
       }
@@ -245,10 +302,14 @@ function renderSongs(items, options = {}) {
     button.addEventListener("click", () => playSong(song));
     actions.appendChild(button);
 
-    card.appendChild(info);
+    card.appendChild(left);
     card.appendChild(actions);
     listContent.appendChild(card);
   });
+
+  if (currentList[currentIndex]) {
+    setActiveCard(currentList[currentIndex].id);
+  }
 }
 
 function renderArtists(items) {
@@ -261,15 +322,26 @@ function renderArtists(items) {
   items.forEach((artist, index) => {
     const card = document.createElement("div");
     card.className = "song-card";
+    const left = document.createElement("div");
+    left.className = "song-left";
+
+    const rank = document.createElement("div");
+    rank.className = "song-rank";
+    rank.textContent = index + 1;
+
+    const info = document.createElement("div");
     const title = document.createElement("p");
     title.className = "song-title";
-    title.textContent = `${index + 1}. ${artist.artist}`;
+    title.textContent = artist.artist;
 
     const meta = document.createElement("p");
     meta.className = "song-meta";
     meta.textContent = `Qo'shiqlar: ${artist.song_count} • Yuklash: ${artist.total_downloads}`;
-    card.appendChild(title);
-    card.appendChild(meta);
+    info.appendChild(title);
+    info.appendChild(meta);
+    left.appendChild(rank);
+    left.appendChild(info);
+    card.appendChild(left);
     card.addEventListener("click", () => loadArtist(artist.artist));
     listContent.appendChild(card);
   });
@@ -303,7 +375,9 @@ async function loadSection(sectionId) {
   listTitle.textContent = section.title;
   listSubtitle.textContent = section.subtitle || "";
   showListView();
-  playerCard.classList.add("hidden");
+  if (!audioPlayer.src) {
+    playerCard.classList.add("hidden");
+  }
 
   if (sectionId === "all") {
     buildAllTools();
@@ -315,12 +389,17 @@ async function loadSection(sectionId) {
 
   try {
     const data = await fetchJSON(section.endpoint);
+    const items = data.items || [];
+    if (items.length) {
+      const countLabel = section.type === "artists" ? `${items.length} ta artist` : `${items.length} ta qo'shiq`;
+      listSubtitle.textContent = `${section.subtitle} • ${countLabel}`;
+    }
     if (section.type === "artists") {
-      renderArtists(data.items || []);
+      renderArtists(items);
     } else if (section.type === "all") {
-      renderSongs(data.items || [], { showPins: true, sortMode: "downloads" });
+      renderSongs(items, { showPins: true, sortMode: "downloads" });
     } else {
-      renderSongs(data.items || []);
+      renderSongs(items);
     }
   } catch (err) {
     setEmpty("Ma'lumotlarni yuklashda xato yuz berdi.");
@@ -349,6 +428,23 @@ backButton.addEventListener("click", showSectionView);
 prevButton.addEventListener("click", handlePrev);
 nextButton.addEventListener("click", handleNext);
 audioPlayer.addEventListener("ended", handleNext);
+audioPlayer.addEventListener("timeupdate", updateProgress);
+audioPlayer.addEventListener("loadedmetadata", updateProgress);
+audioPlayer.addEventListener("play", () => setPlayState(true));
+audioPlayer.addEventListener("pause", () => setPlayState(false));
+seekBar.addEventListener("input", () => {
+  if (!audioPlayer.duration) return;
+  const target = (Number(seekBar.value) / 100) * audioPlayer.duration;
+  audioPlayer.currentTime = target;
+});
+playPauseButton.addEventListener("click", () => {
+  if (!audioPlayer.src) return;
+  if (audioPlayer.paused) {
+    audioPlayer.play().catch(() => setPlayState(false));
+  } else {
+    audioPlayer.pause();
+  }
+});
 
 if (window.Telegram && window.Telegram.WebApp) {
   window.Telegram.WebApp.ready();
