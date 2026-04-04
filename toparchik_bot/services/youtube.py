@@ -1,4 +1,5 @@
 import asyncio
+import time
 import base64
 import os
 import re
@@ -432,9 +433,9 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     # Skip temporarily blocked videos to avoid repeated failures
     video_id_match = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{6,})', url)
-    if video_id_match:
-        vid = video_id_match.group(1)
-        now = asyncio.get_event_loop().time()
+    vid = video_id_match.group(1) if video_id_match else None
+    if vid:
+        now = time.monotonic()
         blocked_until = _blocked_until.get(vid)
         if blocked_until and blocked_until > now:
             raise Exception("Bu video vaqtincha bloklangan. Keyinroq urinib ko'ring.")
@@ -574,8 +575,8 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                     "cheklangan bo'ladi — YOUTUBE_PO_TOKEN qo'shib ko'ring yoki boshqa link yuboring."
                 )
             # Mark video as blocked to reduce noisy retries
-            if video_id_match and YTDLP_BLOCK_TTL_SEC > 0:
-                _blocked_until[vid] = asyncio.get_event_loop().time() + YTDLP_BLOCK_TTL_SEC
+            if vid and YTDLP_BLOCK_TTL_SEC > 0:
+                _blocked_until[vid] = time.monotonic() + YTDLP_BLOCK_TTL_SEC
             logger.error(f"Download error for {url}: {e}")
             raise Exception(msg)
 
