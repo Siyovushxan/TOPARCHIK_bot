@@ -169,9 +169,9 @@ def build_youtube_profile() -> dict:
     # PO Token va Visitor Data ni formatlash
     if YOUTUBE_PO_TOKEN:
         youtube_args["po_token"] = _parse_po_tokens(YOUTUBE_PO_TOKEN)
-        # PO token odatda web client bilan yaxshi ishlaydi
-        youtube_args["player_client"] = ["web"]
-        youtube_args["player_skip"] = ["webpage", "configs"]
+        # PO token bo'lsa ham boshqa clientlarni saqlab qolamiz
+        if "web" not in youtube_args["player_client"]:
+            youtube_args["player_client"].insert(0, "web")
     
     if YOUTUBE_VISITOR_DATA:
         visitor_data = YOUTUBE_VISITOR_DATA.strip()
@@ -224,6 +224,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "nocheckcertificate": True,
         "concurrent_fragment_downloads": 10,  # Tezlikni oshirish uchun
         "socket_timeout": 30,
+        "allow_unplayable_formats": True,
         "postprocessor_args": {
             "ffmpeg": [
                 "-threads", "0",        # Barcha CPU yadrolaridan foydalanish
