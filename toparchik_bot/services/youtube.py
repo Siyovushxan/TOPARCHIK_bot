@@ -4,6 +4,7 @@ import os
 import re
 import logging
 import yt_dlp
+from urllib.parse import unquote
 from googleapiclient.discovery import build
 from toparchik_bot.config import (
     DOWNLOAD_DIR,
@@ -173,7 +174,13 @@ def build_youtube_profile() -> dict:
         youtube_args["player_skip"] = ["webpage", "configs"]
     
     if YOUTUBE_VISITOR_DATA:
-        youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
+        visitor_data = YOUTUBE_VISITOR_DATA.strip()
+        if "%" in visitor_data:
+            try:
+                visitor_data = unquote(visitor_data)
+            except Exception:
+                pass
+        youtube_args["visitor_data"] = [visitor_data]
         
     return {"extractor_args": {"youtube": youtube_args}}
 
