@@ -219,6 +219,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     if audio_only:
         opts.update({
             "format": "bestaudio[ext=m4a]/bestaudio/best",
+            "format_sort": ["hasaud", "acodec", "abr:desc"],
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -398,27 +399,39 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     opts = get_yt_dlp_opts(outtmpl, audio_only)
 
+    def _download_with_opts(current_opts):
+        with yt_dlp.YoutubeDL(current_opts) as ydl:
+            _info = ydl.extract_info(url, download=True)
+            final_filename = ydl.prepare_filename(_info)
+
+            if audio_only:
+                base_path = os.path.splitext(final_filename)[0]
+                mp3_path = base_path + ".mp3"
+                if os.path.exists(mp3_path):
+                    return _info, mp3_path
+
+            return _info, final_filename
+
     def _download():
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                _info = ydl.extract_info(url, download=True)
-                final_filename = ydl.prepare_filename(_info)
-
-                if audio_only:
-                    base_path = os.path.splitext(final_filename)[0]
-                    mp3_path = base_path + ".mp3"
-                    if os.path.exists(mp3_path):
-                        return _info, mp3_path
-
-                return _info, final_filename
+            return _download_with_opts(opts)
         except Exception as e:
             msg = str(e)
+            if "Requested format is not available" in msg and audio_only:
+                # Retry with a more permissive format
+                fallback_opts = dict(opts)
+                fallback_opts["format"] = "bestaudio/best"
+                fallback_opts.pop("format_sort", None)
+                try:
+                    return _download_with_opts(fallback_opts)
+                except Exception as e2:
+                    msg = str(e2)
             if "Sign in to confirm" in msg or "bot" in msg.lower():
                 msg = (
                     "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
                     "Iltimos cookie ni yangilang yoki keyinroq urinib ko'ring."
                 )
-            elif "format is not available" in msg:
+            elif "format is not available" in msg or "Requested format is not available" in msg:
                 msg = "Ushbu audioga ruxsat berilmadi yoki format topilmadi."
             logger.error(f"Download error for {url}: {e}")
             raise Exception(msg)
