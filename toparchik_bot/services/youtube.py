@@ -197,7 +197,6 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "nocheckcertificate": True,
         "concurrent_fragment_downloads": 10,  # Tezlikni oshirish uchun
         "socket_timeout": 30,
-        "impersonate": "chrome",
         "postprocessor_args": {
             "ffmpeg": [
                 "-threads", "0",        # Barcha CPU yadrolaridan foydalanish
@@ -352,7 +351,6 @@ def _search_yt_dlp_sync(query: str, max_results: int = 10):
         "noplaylist": True,
         "no_warnings": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
-        "impersonate": "chrome",
     }
     if cookie_path:
         ydl_opts["cookiefile"] = cookie_path
