@@ -1,189 +1,103 @@
-const sectionView = document.getElementById("section-view");
-const listView = document.getElementById("list-view");
-const listTitle = document.getElementById("list-title");
-const listSubtitle = document.getElementById("list-subtitle");
-const listContent = document.getElementById("list-content");
-const listTools = document.getElementById("list-tools");
-const backButton = document.getElementById("backButton");
-const playerCard = document.getElementById("player-card");
-const playerTitle = document.getElementById("player-title");
-const playerArtist = document.getElementById("player-artist");
-const playerMeta = document.getElementById("player-meta");
-const playerCover = document.getElementById("player-cover");
+const searchInput = document.getElementById("searchInput");
+const chipRow = document.getElementById("chipRow");
+const homeView = document.getElementById("homeView");
+const homeList = document.getElementById("homeList");
+const artistsView = document.getElementById("artistsView");
+const artistList = document.getElementById("artistList");
+const artistDetailView = document.getElementById("artistDetailView");
+const artistSongs = document.getElementById("artistSongs");
+const artistName = document.getElementById("artistName");
+const artistBack = document.getElementById("artistBack");
+const libraryView = document.getElementById("libraryView");
+const libraryList = document.getElementById("libraryList");
+const libraryCount = document.getElementById("libraryCount");
+const miniPlayer = document.getElementById("miniPlayer");
+const miniTitle = document.getElementById("miniTitle");
+const miniPlay = document.getElementById("miniPlay");
+const miniNext = document.getElementById("miniNext");
+const sheetBackdrop = document.getElementById("sheetBackdrop");
+const playerSheet = document.getElementById("playerSheet");
+const sheetClose = document.getElementById("sheetClose");
+const sheetFav = document.getElementById("sheetFav");
+const disc = document.getElementById("disc");
+const sheetTitle = document.getElementById("sheetTitle");
+const sheetArtist = document.getElementById("sheetArtist");
+const sheetSeek = document.getElementById("sheetSeek");
+const sheetCurrent = document.getElementById("sheetCurrent");
+const sheetTotal = document.getElementById("sheetTotal");
+const sheetPrev = document.getElementById("sheetPrev");
+const sheetPlay = document.getElementById("sheetPlay");
+const sheetNext = document.getElementById("sheetNext");
+const sheetStats = document.getElementById("sheetStats");
 const audioPlayer = document.getElementById("audio-player");
-const prevButton = document.getElementById("prevButton");
-const nextButton = document.getElementById("nextButton");
-const playPauseButton = document.getElementById("playPauseButton");
-const seekBar = document.getElementById("seekBar");
-const currentTimeEl = document.getElementById("currentTime");
-const totalTimeEl = document.getElementById("totalTime");
 
-const sections = {
-  top: {
-    title: "Top yuklanganlar",
-    subtitle: "Eng mashhur va tez-tez tinglangan qo'shiqlar.",
-    endpoint: "/api/top?limit=500",
-    type: "songs",
-  },
-  artists: {
-    title: "Artistlar",
-    subtitle: "Eng ko'p yuklangan ijrochilar.",
-    endpoint: "/api/artists",
-    type: "artists",
-  },
-  instagram: {
-    title: "Instagram",
-    subtitle: "Instagram orqali yuklangan kontent.",
-    endpoint: "/api/platform/instagram?limit=500",
-    type: "songs",
-  },
-  youtube: {
-    title: "YouTube",
-    subtitle: "YouTube orqali yuklangan audio va videolar.",
-    endpoint: "/api/platform/youtube?limit=500",
-    type: "songs",
-  },
-  tiktok: {
-    title: "TikTok",
-    subtitle: "TikTokdan olingan eng yangi musiqalar.",
-    endpoint: "/api/platform/tiktok?limit=500",
-    type: "songs",
-  },
-  all: {
-    title: "Barchasi",
-    subtitle: "Bot orqali yuklangan barcha qo'shiqlar.",
-    endpoint: "/api/all?limit=5000",
-    type: "all",
-  },
+const API = {
+  top: "/api/top?limit=500",
+  instagram: "/api/platform/instagram?limit=500",
+  youtube: "/api/platform/youtube?limit=500",
+  tiktok: "/api/platform/tiktok?limit=500",
+  all: "/api/all?limit=5000",
 };
 
-const PIN_STORAGE_KEY = "toparchik_pins";
-let currentList = [];
-let currentIndex = -1;
-let currentSection = null;
-let currentSort = "downloads";
+const state = {
+  tab: "top",
+  view: "home",
+  playlist: [],
+  currentIndex: -1,
+  currentSong: null,
+  searchTimer: null,
+  favorites: new Set(),
+  songStore: new Map(),
+};
 
-function loadPins() {
+const FAV_KEY = "toparchik_favs";
+
+function loadFavorites() {
   try {
-    const raw = localStorage.getItem(PIN_STORAGE_KEY);
-    return new Set(raw ? JSON.parse(raw) : []);
+    const raw = localStorage.getItem(FAV_KEY);
+    if (raw) {
+      state.favorites = new Set(JSON.parse(raw));
+    }
   } catch {
-    return new Set();
+    state.favorites = new Set();
   }
 }
 
-function savePins(pins) {
-  localStorage.setItem(PIN_STORAGE_KEY, JSON.stringify([...pins]));
+function saveFavorites() {
+  localStorage.setItem(FAV_KEY, JSON.stringify([...state.favorites]));
 }
 
-function showSectionView() {
-  listView.classList.add("hidden");
-  sectionView.classList.remove("hidden");
-  playerCard.classList.add("hidden");
+function showSkeleton(container, count = 5) {
+  container.innerHTML = "";
+  for (let i = 0; i < count; i += 1) {
+    const sk = document.createElement("div");
+    sk.className = "skeleton";
+    container.appendChild(sk);
+  }
 }
 
-function showListView() {
-  sectionView.classList.add("hidden");
-  listView.classList.remove("hidden");
+function setActiveView(view) {
+  state.view = view;
+  [homeView, artistsView, artistDetailView, libraryView].forEach((el) => {
+    el.classList.remove("active");
+  });
+  if (view === "home") homeView.classList.add("active");
+  if (view === "artists") artistsView.classList.add("active");
+  if (view === "artist_detail") artistDetailView.classList.add("active");
+  if (view === "library") libraryView.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.classList.toggle("active", item.dataset.nav === view);
+  });
 }
 
-function setLoading() {
-  listContent.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
-}
-
-function setEmpty(message) {
-  listContent.innerHTML = `<div class="empty-state">${message}</div>`;
+function setActiveChip(tab) {
+  state.tab = tab;
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.tab === tab);
+  });
 }
 
 function formatDuration(seconds) {
-  const total = Number(seconds || 0);
-  if (!total) return "";
-  const mins = Math.floor(total / 60);
-  const secs = Math.floor(total % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-async function fetchJSON(url, options = {}) {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error("Request failed");
-  }
-  return response.json();
-}
-
-function ensurePlaylist(list, songId) {
-  currentList = Array.isArray(list) ? list : [];
-  currentIndex = currentList.findIndex((song) => song.id === songId);
-  if (currentIndex < 0) {
-    currentIndex = 0;
-  }
-}
-
-function updatePlayer(song) {
-  if (!song) return;
-  playerTitle.textContent = song.title || "Ijro";
-  playerArtist.textContent = song.artist || "Noma'lum ijrochi";
-  playerCover.textContent = (song.artist || song.title || "T").trim().charAt(0).toUpperCase();
-  const parts = [];
-  if (song.download_count !== undefined) {
-    parts.push(`Yuklash: ${song.download_count}`);
-  }
-  if (song.play_count !== undefined) {
-    parts.push(`Eshitish: ${song.play_count}`);
-  }
-  playerMeta.textContent = parts.join(" • ");
-  totalTimeEl.textContent = formatClock(song.duration || audioPlayer.duration || 0);
-  currentTimeEl.textContent = "0:00";
-  seekBar.value = 0;
-  playerCard.classList.remove("hidden");
-}
-
-async function playSong(song) {
-  if (!song || !song.file_id) return;
-  ensurePlaylist(currentList, song.id);
-  const src = `/api/audio/${encodeURIComponent(song.file_id)}?t=${Date.now()}`;
-  audioPlayer.src = src;
-  updatePlayer(song);
-  audioPlayer.play().catch(() => {
-    setPlayState(false);
-  });
-  setActiveCard(song.id);
-
-  if (song.id) {
-    try {
-      await fetchJSON(`/api/play/${encodeURIComponent(song.id)}`, { method: "POST" });
-      song.play_count = (song.play_count || 0) + 1;
-      if (currentSection === "all" && song.play_count >= 2) {
-        renderSongs(currentList, { showPins: true, sortMode: currentSort });
-      }
-    } catch {
-      // ignore
-    }
-  }
-}
-
-function playSongByIndex(index) {
-  if (index < 0 || index >= currentList.length) return;
-  currentIndex = index;
-  playSong(currentList[index]);
-}
-
-function handlePrev() {
-  if (currentIndex <= 0) return;
-  playSongByIndex(currentIndex - 1);
-}
-
-function handleNext() {
-  if (currentIndex < 0) return;
-  if (currentIndex >= currentList.length - 1) return;
-  playSongByIndex(currentIndex + 1);
-}
-
-function setPlayState(isPlaying) {
-  playPauseButton.textContent = isPlaying ? "Pause" : "Play";
-}
-
-function formatClock(seconds) {
   const total = Number(seconds || 0);
   if (!total) return "0:00";
   const mins = Math.floor(total / 60);
@@ -191,260 +105,382 @@ function formatClock(seconds) {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+function formatCount(value) {
+  const num = Number(value || 0);
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return `${num}`;
+}
+
+function platformIcon(song) {
+  const platform = (song.platform || "").toLowerCase();
+  if (platform === "youtube") return "▶️";
+  if (platform === "instagram") return "📱";
+  if (platform === "tiktok") return "🎵";
+  if (state.tab === "top") return "🔥";
+  if (state.tab === "all") return "♾️";
+  return "🎵";
+}
+
+function getMarquee(title) {
+  if (!title) return "";
+  if (title.length <= 22) return title;
+  return `<span class="marquee">${title}</span>`;
+}
+
+function mapSongStore(items) {
+  items.forEach((song) => {
+    if (song && song.id) {
+      state.songStore.set(song.id, song);
+    }
+  });
+}
+
+async function fetchJSON(url, options = {}) {
+  const response = await fetch(url, options);
+  if (!response.ok) throw new Error("Request failed");
+  return response.json();
+}
+
+function closeMenus() {
+  document.querySelectorAll(".menu.show").forEach((menu) => menu.classList.remove("show"));
+}
+
+function renderSongs(container, items = [], playlist = true) {
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div class="empty-state">Hozircha qo\'shiqlar topilmadi.</div>';
+    return;
+  }
+  mapSongStore(items);
+  if (playlist) {
+    state.playlist = items;
+  }
+  container.innerHTML = "";
+
+  items.forEach((song) => {
+    const card = document.createElement("div");
+    card.className = "song-card";
+    card.dataset.songId = song.id || "";
+
+    const left = document.createElement("div");
+    left.className = "song-left";
+    const icon = document.createElement("div");
+    icon.className = "platform-icon";
+    icon.textContent = platformIcon(song);
+
+    const text = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "song-title";
+    title.innerHTML = getMarquee(song.title || "Audio");
+
+    const artist = document.createElement("div");
+    artist.className = "song-artist";
+    artist.textContent = song.artist || "Noma'lum ijrochi";
+
+    const meta = document.createElement("div");
+    meta.className = "song-meta";
+    meta.textContent = `⏱️ ${formatDuration(song.duration)} | 🎧 ${formatCount(song.play_count)} | ⬇️ ${formatCount(song.download_count)}`;
+
+    text.appendChild(title);
+    text.appendChild(artist);
+    text.appendChild(meta);
+    left.appendChild(icon);
+    left.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "song-actions";
+    const playBtn = document.createElement("button");
+    playBtn.className = "play-button";
+    playBtn.textContent = "▶";
+    playBtn.addEventListener("click", () => playSong(song, items));
+
+    const moreBtn = document.createElement("button");
+    moreBtn.className = "more-button";
+    moreBtn.textContent = "⋮";
+    const menu = document.createElement("div");
+    menu.className = "menu";
+    const shareBtn = document.createElement("button");
+    shareBtn.textContent = "Ulashish";
+    shareBtn.addEventListener("click", () => handleShare(song));
+    const uploadBtn = document.createElement("button");
+    uploadBtn.textContent = "Kanalga yuklash";
+    uploadBtn.addEventListener("click", () => window.open("https://t.me/toparchik_ai", "_blank"));
+    menu.appendChild(shareBtn);
+    menu.appendChild(uploadBtn);
+    moreBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeMenus();
+      menu.classList.toggle("show");
+    });
+
+    actions.appendChild(playBtn);
+    actions.appendChild(moreBtn);
+    card.appendChild(left);
+    card.appendChild(actions);
+    card.appendChild(menu);
+    container.appendChild(card);
+  });
+
+  setActiveCard(state.currentSong?.id);
+}
+
+function renderArtists(items = []) {
+  if (!items || items.length === 0) {
+    artistList.innerHTML = '<div class="empty-state">Hozircha artistlar topilmadi.</div>';
+    return;
+  }
+  artistList.innerHTML = "";
+  items.forEach((artist) => {
+    const card = document.createElement("div");
+    card.className = "song-card";
+    const left = document.createElement("div");
+    left.className = "song-left";
+    const icon = document.createElement("div");
+    icon.className = "platform-icon";
+    icon.textContent = artist.artist?.charAt(0)?.toUpperCase() || "A";
+    const text = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "song-title";
+    title.textContent = artist.artist || "Artist";
+    const meta = document.createElement("div");
+    meta.className = "song-meta";
+    meta.textContent = `Qo'shiqlar: ${artist.song_count} | ⬇️ ${formatCount(artist.total_downloads)}`;
+    text.appendChild(title);
+    text.appendChild(meta);
+    left.appendChild(icon);
+    left.appendChild(text);
+    card.appendChild(left);
+    card.addEventListener("click", () => loadArtistSongs(artist.artist));
+    artistList.appendChild(card);
+  });
+}
+
+function renderLibrary() {
+  const items = [...state.favorites].map((id) => state.songStore.get(id)).filter(Boolean);
+  libraryCount.textContent = items.length;
+  renderSongs(libraryList, items, false);
+}
+
+async function loadTab(tab) {
+  setActiveChip(tab);
+  showSkeleton(homeList, 6);
+  try {
+    const data = await fetchJSON(API[tab]);
+    renderSongs(homeList, data.items || [], true);
+  } catch {
+    homeList.innerHTML = '<div class="empty-state">Ma\'lumotlarni yuklashda xato yuz berdi.</div>';
+  }
+}
+
+async function loadArtists() {
+  showSkeleton(artistList, 5);
+  try {
+    const data = await fetchJSON("/api/artists");
+    renderArtists(data.items || []);
+  } catch {
+    artistList.innerHTML = '<div class="empty-state">Artistlar yuklanmadi.</div>';
+  }
+}
+
+async function loadArtistSongs(artist) {
+  artistName.textContent = artist || "Artist";
+  setActiveView("artist_detail");
+  showSkeleton(artistSongs, 5);
+  try {
+    const data = await fetchJSON(`/api/artist/${encodeURIComponent(artist)}`);
+    renderSongs(artistSongs, data.items || [], true);
+  } catch {
+    artistSongs.innerHTML = '<div class="empty-state">Artist qo\'shiqlari topilmadi.</div>';
+  }
+}
+
+async function handleSearch(query) {
+  if (!query) {
+    loadTab(state.tab);
+    return;
+  }
+  setActiveView("home");
+  showSkeleton(homeList, 5);
+  try {
+    const data = await fetchJSON(`/api/search?q=${encodeURIComponent(query)}`);
+    renderSongs(homeList, data.items || [], true);
+  } catch {
+    homeList.innerHTML = '<div class="empty-state">Qidiruvda xato yuz berdi.</div>';
+  }
+}
+
+function setActiveCard(songId) {
+  if (!songId) return;
+  document.querySelectorAll(".song-card").forEach((card) => {
+    card.classList.toggle("is-playing", card.dataset.songId === songId);
+  });
+}
+
+async function playSong(song, list) {
+  if (!song || !song.file_id) return;
+  state.currentSong = song;
+  if (list) {
+    state.playlist = list;
+    state.currentIndex = list.findIndex((item) => item.id === song.id);
+  }
+  audioPlayer.src = `/api/audio/${encodeURIComponent(song.file_id)}?t=${Date.now()}`;
+  await audioPlayer.play().catch(() => {});
+  updateMiniPlayer();
+  updateSheet();
+  setActiveCard(song.id);
+
+  if (song.id) {
+    try {
+      await fetchJSON(`/api/play/${encodeURIComponent(song.id)}`, { method: "POST" });
+      song.play_count = (song.play_count || 0) + 1;
+      updateSheet();
+      renderLibrary();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function updateMiniPlayer() {
+  if (!state.currentSong) return;
+  const title = state.currentSong.title || "Ijro";
+  miniTitle.innerHTML = title.length > 22 ? `<span class="mini-marquee">${title}</span>` : title;
+  miniPlayer.style.display = "flex";
+}
+
+function openSheet() {
+  sheetBackdrop.classList.add("show");
+  playerSheet.classList.add("show");
+}
+
+function closeSheet() {
+  sheetBackdrop.classList.remove("show");
+  playerSheet.classList.remove("show");
+}
+
+function updateSheet() {
+  if (!state.currentSong) return;
+  sheetTitle.textContent = state.currentSong.title || "Ijro";
+  sheetArtist.textContent = state.currentSong.artist || "Noma'lum ijrochi";
+  sheetStats.textContent = `🎧 ${formatCount(state.currentSong.play_count)} • ⬇️ ${formatCount(state.currentSong.download_count)} • ⏱️ ${formatDuration(state.currentSong.duration)}`;
+  const isFav = state.favorites.has(state.currentSong.id);
+  sheetFav.textContent = isFav ? "❤" : "♡";
+}
+
+function toggleFavorite() {
+  if (!state.currentSong) return;
+  if (state.favorites.has(state.currentSong.id)) {
+    state.favorites.delete(state.currentSong.id);
+  } else {
+    state.favorites.add(state.currentSong.id);
+  }
+  saveFavorites();
+  updateSheet();
+  renderLibrary();
+}
+
+function handleShare(song) {
+  const text = `${song.title || "Qo'shiq"} - ${song.artist || ""}`.trim();
+  if (navigator.share) {
+    navigator.share({ text });
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+  }
+  closeMenus();
+}
+
+function nextSong() {
+  if (state.playlist.length === 0) return;
+  const nextIndex = Math.min(state.playlist.length - 1, state.currentIndex + 1);
+  state.currentIndex = nextIndex;
+  playSong(state.playlist[nextIndex], state.playlist);
+}
+
+function prevSong() {
+  if (state.playlist.length === 0) return;
+  const prevIndex = Math.max(0, state.currentIndex - 1);
+  state.currentIndex = prevIndex;
+  playSong(state.playlist[prevIndex], state.playlist);
+}
+
 function updateProgress() {
   const duration = audioPlayer.duration || 0;
   const current = audioPlayer.currentTime || 0;
   if (duration > 0) {
-    const percent = Math.min(100, Math.max(0, (current / duration) * 100));
-    seekBar.value = percent;
-    totalTimeEl.textContent = formatClock(duration);
+    sheetSeek.value = Math.min(100, Math.max(0, (current / duration) * 100));
+    sheetTotal.textContent = formatDuration(duration);
   }
-  currentTimeEl.textContent = formatClock(current);
+  sheetCurrent.textContent = formatDuration(current);
+  disc.classList.toggle("playing", !audioPlayer.paused);
+  miniPlay.textContent = audioPlayer.paused ? "▶" : "⏸";
 }
 
-function setActiveCard(songId) {
-  document.querySelectorAll(".song-card").forEach((card) => {
-    const isActive = card.dataset.songId === String(songId);
-    card.classList.toggle("is-playing", isActive);
+function initEvents() {
+  chipRow.addEventListener("click", (e) => {
+    const target = e.target.closest(".chip");
+    if (!target) return;
+    setActiveView("home");
+    loadTab(target.dataset.tab);
   });
-}
 
-function renderSongs(items, options = {}) {
-  const { showPins = false, sortMode = "downloads" } = options;
-  currentSort = sortMode;
-  if (!items || items.length === 0) {
-    setEmpty("Hozircha qo'shiqlar topilmadi.");
-    return;
-  }
-
-  const pins = loadPins();
-  let list = [...items];
-
-  if (showPins) {
-    list.sort((a, b) => {
-      const aPinned = pins.has(a.id);
-      const bPinned = pins.has(b.id);
-      if (aPinned !== bPinned) return aPinned ? -1 : 1;
-      const aBoost = (a.play_count || 0) >= 2;
-      const bBoost = (b.play_count || 0) >= 2;
-      if (aBoost !== bBoost) return aBoost ? -1 : 1;
-      if (sortMode === "plays") {
-        const diff = (b.play_count || 0) - (a.play_count || 0);
-        if (diff !== 0) return diff;
-      } else if (sortMode === "title") {
-        return (a.title || "").localeCompare(b.title || "");
-      }
-      const diff = (b.download_count || 0) - (a.download_count || 0);
-      if (diff !== 0) return diff;
-      return (a.title || "").localeCompare(b.title || "");
+  document.querySelectorAll(".nav-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      setActiveView(item.dataset.nav);
+      if (item.dataset.nav === "artists") loadArtists();
+      if (item.dataset.nav === "library") renderLibrary();
     });
-  }
-
-  currentList = list;
-  listContent.innerHTML = "";
-
-  list.forEach((song, index) => {
-    const card = document.createElement("div");
-    card.className = "song-card";
-    card.dataset.songId = song.id;
-
-    const left = document.createElement("div");
-    left.className = "song-left";
-
-    const rank = document.createElement("div");
-    rank.className = "song-rank";
-    rank.textContent = index + 1;
-
-    const info = document.createElement("div");
-    const title = document.createElement("p");
-    title.className = "song-title";
-    title.textContent = song.title || "Audio";
-
-    const meta = document.createElement("p");
-    meta.className = "song-meta";
-    const duration = formatDuration(song.duration);
-    const artist = song.artist ? ` • ${song.artist}` : "";
-    const downloads = ` • Yuklash: ${song.download_count || 0}`;
-    const listens = song.play_count ? ` • Eshitish: ${song.play_count}` : "";
-    meta.textContent = `${duration || "0:00"}${artist}${downloads}${listens}`;
-
-    info.appendChild(title);
-    info.appendChild(meta);
-    left.appendChild(rank);
-    left.appendChild(info);
-
-    const actions = document.createElement("div");
-    actions.className = "song-actions";
-
-    if (showPins) {
-      const pinButton = document.createElement("button");
-      pinButton.className = "pin-button";
-      pinButton.textContent = pins.has(song.id) ? "Pinned" : "Pin";
-      if (pins.has(song.id)) {
-        pinButton.classList.add("active");
-      }
-      pinButton.addEventListener("click", () => {
-        if (pins.has(song.id)) {
-          pins.delete(song.id);
-        } else {
-          pins.add(song.id);
-        }
-        savePins(pins);
-        renderSongs(list, { showPins: true, sortMode });
-      });
-      actions.appendChild(pinButton);
-    }
-
-    const button = document.createElement("button");
-    button.className = "play-button";
-    button.textContent = song.playable ? "Play" : "N/A";
-    button.disabled = !song.playable;
-    button.addEventListener("click", () => playSong(song));
-    actions.appendChild(button);
-
-    card.appendChild(left);
-    card.appendChild(actions);
-    listContent.appendChild(card);
   });
 
-  if (currentList[currentIndex]) {
-    setActiveCard(currentList[currentIndex].id);
-  }
-}
-
-function renderArtists(items) {
-  if (!items || items.length === 0) {
-    setEmpty("Hozircha artistlar topilmadi.");
-    return;
-  }
-
-  listContent.innerHTML = "";
-  items.forEach((artist, index) => {
-    const card = document.createElement("div");
-    card.className = "song-card";
-    const left = document.createElement("div");
-    left.className = "song-left";
-
-    const rank = document.createElement("div");
-    rank.className = "song-rank";
-    rank.textContent = index + 1;
-
-    const info = document.createElement("div");
-    const title = document.createElement("p");
-    title.className = "song-title";
-    title.textContent = artist.artist;
-
-    const meta = document.createElement("p");
-    meta.className = "song-meta";
-    meta.textContent = `Qo'shiqlar: ${artist.song_count} • Yuklash: ${artist.total_downloads}`;
-    info.appendChild(title);
-    info.appendChild(meta);
-    left.appendChild(rank);
-    left.appendChild(info);
-    card.appendChild(left);
-    card.addEventListener("click", () => loadArtist(artist.artist));
-    listContent.appendChild(card);
-  });
-}
-
-function buildAllTools() {
-  listTools.innerHTML = "";
-  const select = document.createElement("select");
-  select.innerHTML = `
-    <option value="downloads">Yuklash bo'yicha</option>
-    <option value="plays">Eshitish bo'yicha</option>
-    <option value="title">Nomi bo'yicha</option>
-  `;
-  select.addEventListener("change", () => {
-    renderSongs(currentList, { showPins: true, sortMode: select.value });
-  });
-  listTools.appendChild(select);
-  listTools.classList.remove("hidden");
-}
-
-function hideAllTools() {
-  listTools.classList.add("hidden");
-  listTools.innerHTML = "";
-}
-
-async function loadSection(sectionId) {
-  const section = sections[sectionId];
-  if (!section) return;
-
-  currentSection = sectionId;
-  listTitle.textContent = section.title;
-  listSubtitle.textContent = section.subtitle || "";
-  showListView();
-  if (!audioPlayer.src) {
-    playerCard.classList.add("hidden");
-  }
-
-  if (sectionId === "all") {
-    buildAllTools();
-  } else {
-    hideAllTools();
-  }
-
-  setLoading();
-
-  try {
-    const data = await fetchJSON(section.endpoint);
-    const items = data.items || [];
-    if (items.length) {
-      const countLabel = section.type === "artists" ? `${items.length} ta artist` : `${items.length} ta qo'shiq`;
-      listSubtitle.textContent = `${section.subtitle} • ${countLabel}`;
-    }
-    if (section.type === "artists") {
-      renderArtists(items);
-    } else if (section.type === "all") {
-      renderSongs(items, { showPins: true, sortMode: "downloads" });
+  artistBack.addEventListener("click", () => setActiveView("artists"));
+  sheetClose.addEventListener("click", closeSheet);
+  sheetBackdrop.addEventListener("click", closeSheet);
+  sheetFav.addEventListener("click", toggleFavorite);
+  miniPlayer.addEventListener("click", openSheet);
+  miniPlay.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (audioPlayer.paused) {
+      audioPlayer.play().catch(() => {});
     } else {
-      renderSongs(items);
+      audioPlayer.pause();
     }
-  } catch (err) {
-    setEmpty("Ma'lumotlarni yuklashda xato yuz berdi.");
-  }
+  });
+  miniNext.addEventListener("click", (e) => {
+    e.stopPropagation();
+    nextSong();
+  });
+
+  sheetPrev.addEventListener("click", prevSong);
+  sheetNext.addEventListener("click", nextSong);
+  sheetPlay.addEventListener("click", () => {
+    if (audioPlayer.paused) {
+      audioPlayer.play().catch(() => {});
+    } else {
+      audioPlayer.pause();
+    }
+  });
+  sheetSeek.addEventListener("input", () => {
+    if (!audioPlayer.duration) return;
+    audioPlayer.currentTime = (Number(sheetSeek.value) / 100) * audioPlayer.duration;
+  });
+
+  audioPlayer.addEventListener("timeupdate", updateProgress);
+  audioPlayer.addEventListener("loadedmetadata", updateProgress);
+  audioPlayer.addEventListener("ended", nextSong);
+
+  searchInput.addEventListener("input", (e) => {
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(() => {
+      handleSearch(e.target.value.trim());
+    }, 400);
+  });
+
+  document.addEventListener("click", closeMenus);
 }
 
-async function loadArtist(artist) {
-  listTitle.textContent = artist;
-  listSubtitle.textContent = "Artist qo'shiqlari";
-  setLoading();
-  hideAllTools();
-
-  try {
-    const data = await fetchJSON(`/api/artist/${encodeURIComponent(artist)}`);
-    renderSongs(data.items || []);
-  } catch (err) {
-    setEmpty("Artist qo'shiqlarini yuklashda xato.");
-  }
-}
-
-document.querySelectorAll("[data-section]").forEach((item) => {
-  item.addEventListener("click", () => loadSection(item.dataset.section));
-});
-
-backButton.addEventListener("click", showSectionView);
-prevButton.addEventListener("click", handlePrev);
-nextButton.addEventListener("click", handleNext);
-audioPlayer.addEventListener("ended", handleNext);
-audioPlayer.addEventListener("timeupdate", updateProgress);
-audioPlayer.addEventListener("loadedmetadata", updateProgress);
-audioPlayer.addEventListener("play", () => setPlayState(true));
-audioPlayer.addEventListener("pause", () => setPlayState(false));
-seekBar.addEventListener("input", () => {
-  if (!audioPlayer.duration) return;
-  const target = (Number(seekBar.value) / 100) * audioPlayer.duration;
-  audioPlayer.currentTime = target;
-});
-playPauseButton.addEventListener("click", () => {
-  if (!audioPlayer.src) return;
-  if (audioPlayer.paused) {
-    audioPlayer.play().catch(() => setPlayState(false));
-  } else {
-    audioPlayer.pause();
-  }
-});
+loadFavorites();
+initEvents();
+loadTab("top");
 
 if (window.Telegram && window.Telegram.WebApp) {
   window.Telegram.WebApp.ready();

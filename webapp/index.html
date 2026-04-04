@@ -1,26 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="uz">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>TOPARCHIK AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       color-scheme: dark;
-      font-family: "Manrope", "Segoe UI", sans-serif;
-      --bg: #0b0f1d;
-      --bg-deep: #070b16;
+      font-family: "Golos Text", "Segoe UI", sans-serif;
+      --bg: #0f172a;
+      --bg-deep: #000000;
       --card: rgba(16, 22, 48, 0.86);
       --glass: rgba(255, 255, 255, 0.08);
-      --stroke: rgba(120, 135, 255, 0.18);
+      --stroke: rgba(255, 255, 255, 0.14);
       --text: #f7f8ff;
       --muted: #a7b3e6;
-      --accent: #38e1b4;
-      --accent-2: #5b8dff;
-      --accent-3: #ffb067;
+      --accent: #22d3ee;
+      --accent-2: #7c3aed;
+      --accent-3: #4f46e5;
       --shadow: 0 18px 40px rgba(5, 10, 30, 0.45);
     }
     * { box-sizing: border-box; }
@@ -29,365 +29,371 @@
       min-height: 100vh;
       color: var(--text);
       background:
-        radial-gradient(circle at 12% 10%, rgba(56, 225, 180, 0.18), transparent 42%),
-        radial-gradient(circle at 85% 0%, rgba(91, 141, 255, 0.22), transparent 46%),
-        radial-gradient(circle at 50% 80%, rgba(255, 176, 103, 0.12), transparent 45%),
-        linear-gradient(180deg, #090c18 0%, #0b1224 55%, #070b16 100%);
+        radial-gradient(circle at 12% 10%, rgba(34, 211, 238, 0.18), transparent 42%),
+        radial-gradient(circle at 85% 0%, rgba(124, 58, 237, 0.18), transparent 46%),
+        linear-gradient(180deg, #0f172a 0%, #0b1120 60%, #000 100%);
     }
-    .page {
+    .app {
       max-width: 560px;
       margin: 0 auto;
-      padding: 24px 18px 42px;
+      padding: 18px 18px 120px;
+      min-height: 100vh;
+      position: relative;
     }
-    .header {
+    .hero {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 22px;
+      margin-bottom: 14px;
     }
-    .logo {
-      width: 58px;
-      height: 58px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, var(--accent-2), var(--accent));
-      display: grid;
-      place-items: center;
-      font-size: 22px;
-      font-weight: 800;
-      color: #0b0f1d;
-      box-shadow: 0 20px 45px rgba(56, 225, 180, 0.3);
+    .hero h1 {
+      margin: 2px 0 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
     }
-    .title {
-      margin: 0;
-      font-size: 26px;
-      line-height: 1.2;
-      font-weight: 800;
-    }
-    .subtitle {
-      margin: 6px 0 0;
+    .hero small {
       color: var(--muted);
-      font-size: 14px;
-      line-height: 1.6;
+      font-size: 12px;
     }
-    .card {
-      background: var(--card);
-      border: 1px solid rgba(120, 135, 255, 0.2);
-      border-radius: 24px;
-      padding: 20px;
-      margin-bottom: 18px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-    .card h3 {
-      margin: 0 0 10px;
-      font-size: 18px;
-    }
-    .card p {
-      margin: 0;
-      color: #d2d8f8;
-      line-height: 1.7;
-      font-size: 14px;
-    }
-    .section-title {
-      margin: 16px 0 8px;
-      font-size: 16px;
-      font-weight: 700;
-      color: #eef2ff;
-    }
-    .grid {
-      display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      margin-top: 18px;
-    }
-    .item {
-      background: linear-gradient(140deg, rgba(16, 22, 48, 0.95), rgba(11, 16, 36, 0.95));
-      border: 1px solid rgba(120, 135, 255, 0.18);
-      border-radius: 20px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      cursor: pointer;
-      transition: transform 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
-      box-shadow: 0 14px 24px rgba(5, 10, 30, 0.35);
-    }
-    .item:active {
-      transform: scale(0.98);
-      border-color: rgba(56, 225, 180, 0.6);
-      box-shadow: 0 18px 30px rgba(56, 225, 180, 0.2);
-    }
-    .item-title {
-      margin: 0;
-      font-size: 16px;
-      font-weight: 700;
-    }
-    .item-desc {
-      margin: 0;
-      color: #a6b0e7;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .footer {
-      margin-top: 24px;
-      color: #8f9ed8;
-      font-size: 13px;
-      line-height: 1.7;
-      text-align: center;
-    }
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+    .badge {
+      padding: 6px 12px;
       border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 13px;
-      color: #cbdbff;
+      border: 1px solid rgba(34, 211, 238, 0.5);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(34, 211, 238, 0.08);
     }
-    .hidden { display: none; }
-    .list-header {
+    .search-wrap {
+      margin: 12px 0 14px;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .chips {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
     }
-    .back-button {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #d7ddf8;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13px;
+    .chip {
+      flex-shrink: 0;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.04);
       cursor: pointer;
     }
-    .list-title {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 700;
+    .chip.active {
+      color: var(--accent);
+      border-color: rgba(34, 211, 238, 0.6);
+      background: rgba(34, 211, 238, 0.15);
     }
-    .list-subtitle {
-      margin: 4px 0 0;
-      color: #9aa5da;
-      font-size: 13px;
+    .view {
+      display: none;
+      margin-top: 16px;
+    }
+    .view.active {
+      display: block;
     }
     .list {
       display: grid;
       gap: 12px;
     }
-    .list-tools {
+    .song-card {
+      position: relative;
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin: 8px 0 14px;
-    }
-    .list-tools select {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #e7ecff;
-      padding: 8px 10px;
-      border-radius: 10px;
-      font-size: 12px;
-    }
-    .pin-button {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #d7ddf8;
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-    .pin-button.active {
-      background: rgba(56, 225, 180, 0.2);
-      border-color: rgba(56, 225, 180, 0.6);
-      color: #f0f3ff;
-    }
-    .song-card {
-      background: rgba(11, 16, 40, 0.85);
-      border: 1px solid rgba(90, 104, 210, 0.25);
-      border-radius: 18px;
-      padding: 14px 16px;
-      display: flex;
       justify-content: space-between;
       gap: 12px;
-      align-items: center;
-      box-shadow: 0 16px 28px rgba(5, 10, 30, 0.35);
-      transition: border 0.2s ease, box-shadow 0.2s ease;
+      padding: 14px 14px;
+      border-radius: 16px;
+      background: rgba(16, 24, 46, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(18px);
+      transition: transform 0.15s ease, border 0.2s ease;
     }
+    .song-card:active { transform: scale(0.98); }
     .song-card.is-playing {
-      border-color: rgba(56, 225, 180, 0.9);
-      box-shadow: 0 20px 36px rgba(56, 225, 180, 0.25);
+      border-color: rgba(34, 211, 238, 0.6);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35);
     }
     .song-left {
       display: flex;
       align-items: center;
       gap: 12px;
       min-width: 0;
+      flex: 1;
     }
-    .song-rank {
-      width: 32px;
-      height: 32px;
-      border-radius: 10px;
-      background: rgba(56, 225, 180, 0.15);
-      color: var(--accent);
+    .platform-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
       display: grid;
       place-items: center;
-      font-weight: 700;
-      font-size: 12px;
+      font-size: 18px;
+      background: rgba(34, 211, 238, 0.12);
+      color: var(--accent);
       flex-shrink: 0;
     }
     .song-title {
       margin: 0;
       font-size: 14px;
       font-weight: 600;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 220px;
+    }
+    .marquee {
+      display: inline-block;
+      padding-right: 16px;
+      animation: marquee 8s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+    .song-artist {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
     }
     .song-meta {
-      margin: 6px 0 0;
-      font-size: 12px;
-      color: #98a4dc;
+      margin: 4px 0 0;
+      font-size: 11px;
+      color: #7c88b8;
     }
     .song-actions {
       display: flex;
+      align-items: center;
       gap: 8px;
-      flex-shrink: 0;
     }
     .play-button {
-      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
       border: none;
-      color: #0b0f1d;
-      font-size: 12px;
-      padding: 8px 12px;
-      border-radius: 10px;
-      cursor: pointer;
+      color: #001018;
       font-weight: 700;
+      cursor: pointer;
     }
-    .play-button[disabled] {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .more-button {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      cursor: pointer;
     }
-    .player {
-      position: sticky;
-      top: 10px;
-      z-index: 3;
-      margin-top: 8px;
-      padding: 16px;
-      border-radius: 22px;
-      background: linear-gradient(160deg, rgba(14, 20, 44, 0.92), rgba(10, 15, 34, 0.95));
-      border: 1px solid rgba(94, 108, 220, 0.25);
-      box-shadow: var(--shadow);
-      display: grid;
-      gap: 12px;
+    .menu {
+      position: absolute;
+      right: 10px;
+      top: 52px;
+      background: rgba(10, 16, 30, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      padding: 6px;
+      display: none;
+      z-index: 2;
     }
-    .player-hero {
+    .menu button {
+      width: 100%;
+      padding: 8px 12px;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .menu.show { display: block; }
+    .mini-player {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 72px;
+      width: min(520px, calc(100% - 32px));
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: rgba(12, 18, 32, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       display: flex;
       align-items: center;
-      gap: 14px;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 4;
     }
-    .player-info {
-      flex: 1;
+    .mini-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       min-width: 0;
+      flex: 1;
     }
-    .player-cover {
-      width: 58px;
-      height: 58px;
-      border-radius: 18px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #0b0f1d;
-      font-weight: 800;
-      display: grid;
-      place-items: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .player-title {
-      margin: 0 0 4px;
-      font-size: 15px;
-      font-weight: 700;
+    .mini-title {
+      font-size: 12px;
+      font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .player-artist {
-      margin: 0;
+    .mini-marquee {
+      display: inline-block;
+      animation: marquee 8s linear infinite;
+    }
+    .mini-actions button {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(34, 211, 238, 0.2);
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(520px, 100%);
+      display: flex;
+      justify-content: space-around;
+      padding: 12px 18px 18px;
+      background: rgba(6, 10, 20, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      z-index: 3;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
       color: var(--muted);
-      font-size: 12px;
+      cursor: pointer;
     }
-    .player-meta {
-      margin: 6px 0 0;
-      color: #a5b2eb;
-      font-size: 12px;
+    .nav-item.active { color: var(--accent); }
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 8;
     }
-    .player-progress {
+    .sheet-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .sheet {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -100%;
+      width: min(520px, 100%);
+      padding: 24px 18px 28px;
+      border-radius: 24px 24px 0 0;
+      background: linear-gradient(180deg, rgba(10, 16, 32, 0.98), rgba(3, 6, 12, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      z-index: 9;
+      transition: bottom 0.25s ease;
+    }
+    .sheet.show { bottom: 0; }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .disc {
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.2) 10%, rgba(124, 58, 237, 0.12) 45%, rgba(10, 16, 32, 0.9) 70%);
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      animation: spin 10s linear infinite;
+      animation-play-state: paused;
+    }
+    .disc.playing { animation-play-state: running; }
+    .disc::after {
+      content: "";
+      position: absolute;
+      inset: 16px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .sheet-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      margin: 6px 0;
+    }
+    .sheet-artist {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .progress {
       display: flex;
       align-items: center;
       gap: 8px;
+      margin: 10px 0 16px;
     }
-    .player-progress input[type="range"] {
-      flex: 1;
-      appearance: none;
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.12);
-      outline: none;
-    }
-    .player-progress input[type="range"]::-webkit-slider-thumb {
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 0 4px rgba(56, 225, 180, 0.2);
-      cursor: pointer;
-    }
-    .player-progress input[type="range"]::-moz-range-thumb {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: none;
-      cursor: pointer;
-    }
-    .time {
-      font-size: 11px;
-      color: #b8c3f0;
-      min-width: 36px;
-      text-align: center;
-    }
-    .player-controls {
+    .progress input[type="range"] { flex: 1; }
+    .sheet-controls {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
+      gap: 14px;
+      margin-top: 6px;
     }
-    .icon-button {
+    .circle-btn {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
       background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      color: #e6ecff;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+      font-size: 16px;
       cursor: pointer;
     }
-    .play-toggle {
+    .circle-btn.play {
+      width: 64px;
+      height: 64px;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      border: none;
-      color: #0b0f1d;
-      font-size: 13px;
-      font-weight: 700;
-      padding: 10px 18px;
-      border-radius: 12px;
-      cursor: pointer;
+      color: #001018;
     }
-    audio {
-      display: none;
+    .stat-row {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 10px;
     }
+    audio { display: none; }
     .empty-state {
       padding: 18px;
       border-radius: 16px;
@@ -398,94 +404,116 @@
       line-height: 1.6;
       text-align: center;
     }
-    @media (max-width: 420px) {
-      .song-title { max-width: 160px; }
-      .player { top: 6px; }
+    .skeleton {
+      height: 66px;
+      border-radius: 16px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+      animation: pulse 1.4s ease infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+    .time {
+      font-size: 11px;
+      color: #b8c3f0;
+      min-width: 36px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="header">
+  <div class="app">
+    <div class="hero">
       <div>
-        <p class="title">TOPARCHIK AI</p>
-        <p class="subtitle">Telegram ichidagi alohida media app. Kategoriyalar bo'yicha tez topish va eshitish.</p>
+        <small>Xush kelibsiz</small>
+        <h1>TOPARCHIK AI</h1>
       </div>
-      <div class="logo">T</div>
+      <div class="badge">BOT</div>
     </div>
 
-    <div id="section-view">
-      <div class="card">
-        <h3>Web App bo'limlari</h3>
-        <p>Bo'limlardan birini tanlang, keyingi sahifada qo'shiqlar chiqadi va ijro qilish mumkin.</p>
-      </div>
-
-      <p class="section-title">Asosiy bo'limlar</p>
-      <div class="grid" id="section-grid">
-        <div class="item" data-section="top">
-          <p class="item-title">Top yuklanganlar</p>
-          <p class="item-desc">Eng mashhur va tez-tez tinglangan qo'shiqlar.</p>
-        </div>
-        <div class="item" data-section="artists">
-          <p class="item-title">Artistlar</p>
-          <p class="item-desc">Eng ko'p yuklangan ijrochilar va qo'shiqlar.</p>
-        </div>
-        <div class="item" data-section="instagram">
-          <p class="item-title">Instagram</p>
-          <p class="item-desc">Instagram Reels va musiqiy kontent bo'limi.</p>
-        </div>
-        <div class="item" data-section="youtube">
-          <p class="item-title">YouTube</p>
-          <p class="item-desc">YouTube orqali yuklangan audio va videolar.</p>
-        </div>
-        <div class="item" data-section="tiktok">
-          <p class="item-title">TikTok</p>
-          <p class="item-desc">TikTokdan olingan eng yangi musiqalar.</p>
-        </div>
-        <div class="item" data-section="all">
-          <p class="item-title">Barchasi</p>
-          <p class="item-desc">Bot orqali yuklangan barcha qo'shiqlar.</p>
-        </div>
-      </div>
+    <div class="search-wrap">
+      <input id="searchInput" class="search-input" placeholder="Qo'shiq yoki ijrochi..." />
     </div>
 
-    <div id="list-view" class="hidden">
-      <div class="list-header">
-        <button class="back-button" id="backButton">Orqaga</button>
+    <div class="chips" id="chipRow">
+      <button class="chip active" data-tab="top">🔥 Top</button>
+      <button class="chip" data-tab="instagram">📱 Instagram</button>
+      <button class="chip" data-tab="youtube">▶️ YouTube</button>
+      <button class="chip" data-tab="tiktok">🎵 TikTok</button>
+      <button class="chip" data-tab="all">♾️ Barchasi</button>
+    </div>
+
+    <section id="homeView" class="view active">
+      <div id="homeList" class="list"></div>
+    </section>
+
+    <section id="artistsView" class="view">
+      <div id="artistList" class="list"></div>
+    </section>
+
+    <section id="artistDetailView" class="view">
+      <div class="hero" style="margin-bottom:12px;">
         <div>
-          <p class="list-title" id="list-title">Bo'lim</p>
-          <p class="list-subtitle" id="list-subtitle">Tanlangan bo'limdagi qo'shiqlar.</p>
+          <small>Ijrochi</small>
+          <h1 id="artistName">Artist</h1>
         </div>
+        <button class="badge" id="artistBack">Orqaga</button>
       </div>
-      <div id="player-card" class="player hidden">
-        <div class="player-hero">
-          <div class="player-cover" id="player-cover">T</div>
-          <div class="player-info">
-            <p class="player-title" id="player-title">Ijro</p>
-            <p class="player-artist" id="player-artist"></p>
-            <p class="player-meta" id="player-meta"></p>
-          </div>
-        </div>
-        <div class="player-progress">
-          <span class="time" id="currentTime">0:00</span>
-          <input type="range" id="seekBar" min="0" max="100" value="0">
-          <span class="time" id="totalTime">0:00</span>
-        </div>
-        <div class="player-controls">
-          <button class="icon-button" id="prevButton">Orqaga</button>
-          <button class="play-toggle" id="playPauseButton">Play</button>
-          <button class="icon-button" id="nextButton">Keyingi</button>
-        </div>
-        <audio id="audio-player" preload="none"></audio>
-      </div>
-      <div id="list-tools" class="list-tools hidden"></div>
-      <div id="list-content" class="list"></div>
-    </div>
+      <div id="artistSongs" class="list"></div>
+    </section>
 
-    <div class="footer">
-      <div class="pill">TOPARCHIK AI</div>
-      <p>Web app Telegram ichida ishlayapti.</p>
+    <section id="libraryView" class="view">
+      <div class="hero" style="margin-bottom:12px;">
+        <div>
+          <small>Mening</small>
+          <h1>Mening Musiqalarim</h1>
+        </div>
+        <div class="badge" id="libraryCount">0</div>
+      </div>
+      <div id="libraryList" class="list"></div>
+    </section>
+  </div>
+
+  <div id="miniPlayer" class="mini-player" style="display:none;">
+    <div class="mini-left">
+      <div class="platform-icon">🎵</div>
+      <div class="mini-title" id="miniTitle">--</div>
     </div>
+    <div class="mini-actions">
+      <button id="miniPlay">▶</button>
+      <button id="miniNext">⏭</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-nav="home">🏠 Asosiy</div>
+    <div class="nav-item" data-nav="artists">🎤 Ijrochilar</div>
+    <div class="nav-item" data-nav="library">💾 Mening</div>
+  </nav>
+
+  <div id="sheetBackdrop" class="sheet-backdrop"></div>
+  <div id="playerSheet" class="sheet">
+    <div class="sheet-header">
+      <button class="badge" id="sheetClose">⬇</button>
+      <div class="badge" id="sheetFav">♡</div>
+    </div>
+    <div id="disc" class="disc"></div>
+    <div class="sheet-title" id="sheetTitle">--</div>
+    <div class="sheet-artist" id="sheetArtist">--</div>
+    <div class="progress">
+      <span class="time" id="sheetCurrent">0:00</span>
+      <input type="range" id="sheetSeek" min="0" max="100" value="0" />
+      <span class="time" id="sheetTotal">0:00</span>
+    </div>
+    <div class="sheet-controls">
+      <button class="circle-btn" id="sheetPrev">⏮</button>
+      <button class="circle-btn play" id="sheetPlay">⏯</button>
+      <button class="circle-btn" id="sheetNext">⏭</button>
+    </div>
+    <div class="stat-row" id="sheetStats"></div>
+    <audio id="audio-player" preload="none"></audio>
   </div>
 
   <script src="/webapp-static/app.js"></script>
