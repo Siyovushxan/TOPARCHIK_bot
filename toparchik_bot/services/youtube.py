@@ -444,13 +444,15 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         info_opts = {
             "quiet": True,
             "no_warnings": True,
-            "extractor_args": extractor_args_override or opts.get("extractor_args", {}),
+            "extractor_args": opts.get("extractor_args", {}),
             "ignoreerrors": False,
             "no_color": True,
             "geo_bypass": True,
             "nocheckcertificate": True,
             "allow_unplayable_formats": True,
         }
+        if extractor_args_override is not None:
+            info_opts["extractor_args"] = extractor_args_override
         cookie_path = get_cookies_path()
         if cookie_path:
             info_opts["cookiefile"] = cookie_path
@@ -504,7 +506,7 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                             direct_opts["format"] = format_id
                             direct_opts["allow_unplayable_formats"] = True
                             direct_opts.pop("format_sort", None)
-                            if extractor_args:
+                            if extractor_args is not None:
                                 direct_opts["extractor_args"] = extractor_args
                             return _download_with_opts(direct_opts)
                     except Exception as e_info:
