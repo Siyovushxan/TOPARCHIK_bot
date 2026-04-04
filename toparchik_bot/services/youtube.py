@@ -136,7 +136,7 @@ def build_youtube_profile() -> dict:
     ios va android clientlari serverlarda bloklanish ehtimoli ancha past.
     """
     youtube_args: dict = {
-        "player_client": ["android_music", "ios", "android", "mweb"], # android_music eng barqaror profil
+        "player_client": ["web", "android_music", "ios", "android", "mweb", "tv_embedded"],
         "force_ipv4": True,
         "include_dash_manifest": True,
         "include_hls_manifest": True,
@@ -218,8 +218,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
 
     if audio_only:
         opts.update({
-            "format": "bestaudio[ext=m4a]/bestaudio/best",
-            "format_sort": ["hasaud", "acodec", "abr:desc"],
+            "format": "bestaudio/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
