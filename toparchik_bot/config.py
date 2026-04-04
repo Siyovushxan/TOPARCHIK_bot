@@ -29,6 +29,8 @@ YOUTUBE_PO_TOKEN = os.getenv("YOUTUBE_PO_TOKEN")
 YOUTUBE_VISITOR_DATA = os.getenv("YOUTUBE_VISITOR_DATA")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YTDLP_PROXY = os.getenv("YTDLP_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+YTDLP_FORCE_IPV4 = os.getenv("YTDLP_FORCE_IPV4", "1") != "0"
+YTDLP_BLOCK_TTL_SEC = int(os.getenv("YTDLP_BLOCK_TTL_SEC", "21600"))
 
 # Web App
 WEB_APP_URL = os.getenv("WEB_APP_URL", "")

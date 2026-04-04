@@ -15,12 +15,15 @@ from toparchik_bot.config import (
     YOUTUBE_PO_TOKEN,
     YOUTUBE_VISITOR_DATA,
     YOUTUBE_API_KEY,
-    YTDLP_PROXY
+    YTDLP_PROXY,
+    YTDLP_FORCE_IPV4,
+    YTDLP_BLOCK_TTL_SEC
 )
 
 logger = logging.getLogger(__name__)
 _cookie_warning_emitted = False
 _download_sem = asyncio.Semaphore(max(1, DOWNLOAD_CONCURRENCY))
+_blocked_until: dict[str, float] = {}
 
 
 def _warn_once(message: str):
@@ -141,10 +144,11 @@ def build_youtube_profile() -> dict:
     """
     youtube_args: dict = {
         "player_client": ["web", "android_music", "ios", "android", "mweb", "tv_embedded"],
-        "force_ipv4": True,
         "include_dash_manifest": True,
         "include_hls_manifest": True,
     }
+    if YTDLP_FORCE_IPV4:
+        youtube_args["force_ipv4"] = True
     
     def _parse_po_tokens(raw_value: str) -> list[str]:
         tokens = [t.strip() for t in raw_value.split(",") if t.strip()]
@@ -425,6 +429,15 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
     url_match = re.search(r'(https?://[^\s\a\b]+)', url)
     if url_match:
         url = url_match.group(1).replace("\\n", "").strip()
+
+    # Skip temporarily blocked videos to avoid repeated failures
+    video_id_match = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{6,})', url)
+    if video_id_match:
+        vid = video_id_match.group(1)
+        now = asyncio.get_event_loop().time()
+        blocked_until = _blocked_until.get(vid)
+        if blocked_until and blocked_until > now:
+            raise Exception("Bu video vaqtincha bloklangan. Keyinroq urinib ko'ring.")
     
     file_id = f"{chat_id}_{int(asyncio.get_event_loop().time())}"
     file_path = os.path.join(DOWNLOAD_DIR, file_id)
@@ -560,6 +573,9 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                     "Ushbu audio uchun format topilmadi. Ba'zi videolar YouTube tomonidan "
                     "cheklangan bo'ladi — YOUTUBE_PO_TOKEN qo'shib ko'ring yoki boshqa link yuboring."
                 )
+            # Mark video as blocked to reduce noisy retries
+            if video_id_match and YTDLP_BLOCK_TTL_SEC > 0:
+                _blocked_until[vid] = asyncio.get_event_loop().time() + YTDLP_BLOCK_TTL_SEC
             logger.error(f"Download error for {url}: {e}")
             raise Exception(msg)
 
