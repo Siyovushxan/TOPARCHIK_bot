@@ -197,6 +197,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "nocheckcertificate": True,
         "concurrent_fragment_downloads": 10,  # Tezlikni oshirish uchun
         "socket_timeout": 30,
+        "impersonate": "chrome",
         "postprocessor_args": {
             "ffmpeg": [
                 "-threads", "0",        # Barcha CPU yadrolaridan foydalanish
@@ -419,31 +420,48 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         except Exception as e:
             msg = str(e)
             if "Requested format is not available" in msg and audio_only:
-                # Retry with a more permissive format + alternate clients
-                fallback_opts = dict(opts)
-                fallback_opts["format"] = "bestaudio/best"
-                fallback_opts.pop("format_sort", None)
-                fallback_opts["extractor_args"] = {"youtube": {"player_client": ["web", "tv_embedded", "ios"]}}
-                try:
-                    return _download_with_opts(fallback_opts)
-                except Exception as e2:
-                    msg = str(e2)
-                # Final fallback: download best (video+audio) and extract audio
-                final_opts = dict(opts)
-                final_opts["format"] = "best/bestvideo+bestaudio"
-                final_opts.pop("format_sort", None)
-                final_opts["extractor_args"] = {"youtube": {"player_client": ["web", "tv_embedded", "ios"]}}
-                try:
-                    return _download_with_opts(final_opts)
-                except Exception as e3:
-                    msg = str(e3)
+                fallback_variants = [
+                    {
+                        "format": "bestaudio[ext=m4a]/bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["web"]}},
+                    },
+                    {
+                        "format": "140/251/bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["web"]}},
+                    },
+                    {
+                        "format": "bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["web"]}},
+                    },
+                    {
+                        "format": "best",
+                        "extractor_args": {"youtube": {"player_client": ["web"]}},
+                    },
+                    {
+                        "format": "best",
+                        "extractor_args": {},
+                    },
+                ]
+
+                for variant in fallback_variants:
+                    fallback_opts = dict(opts)
+                    fallback_opts.update(variant)
+                    fallback_opts.pop("format_sort", None)
+                    fallback_opts["allow_unplayable_formats"] = True
+                    try:
+                        return _download_with_opts(fallback_opts)
+                    except Exception as e2:
+                        msg = str(e2)
             if "Sign in to confirm" in msg or "bot" in msg.lower():
                 msg = (
                     "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
                     "Iltimos cookie ni yangilang yoki keyinroq urinib ko'ring."
                 )
             elif "format is not available" in msg or "Requested format is not available" in msg:
-                msg = "Ushbu audioga ruxsat berilmadi yoki format topilmadi."
+                msg = (
+                    "Ushbu audio uchun format topilmadi. Ba'zi videolar YouTube tomonidan "
+                    "cheklangan bo'ladi — YOUTUBE_PO_TOKEN qo'shib ko'ring yoki boshqa link yuboring."
+                )
             logger.error(f"Download error for {url}: {e}")
             raise Exception(msg)
 
