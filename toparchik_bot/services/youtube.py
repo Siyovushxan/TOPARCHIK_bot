@@ -452,9 +452,9 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     opts = get_yt_dlp_opts(outtmpl, audio_only)
 
-    def _download_with_opts(current_opts):
+    def _download_with_opts(current_opts, target_url: str | None = None):
         with yt_dlp.YoutubeDL(current_opts) as ydl:
-            _info = ydl.extract_info(url, download=True)
+            _info = ydl.extract_info(target_url or url, download=True)
             final_filename = ydl.prepare_filename(_info)
 
             if audio_only:
@@ -542,6 +542,17 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                             return _download_with_opts(direct_opts)
                     except Exception as e_info:
                         msg = str(e_info)
+
+                # Final attempt: try music.youtube.com for audio-only
+                if vid:
+                    music_url = f"https://music.youtube.com/watch?v={vid}"
+                    try:
+                        music_opts = dict(opts)
+                        music_opts["format"] = "bestaudio/best"
+                        music_opts.pop("format_sort", None)
+                        return _download_with_opts(music_opts, music_url)
+                    except Exception as e_music:
+                        msg = str(e_music)
                 fallback_variants = [
                     {
                         "format": "bestaudio[ext=m4a]/bestaudio/best",
