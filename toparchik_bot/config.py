@@ -56,6 +56,11 @@ ARCHIVE_SYNC_ON_START = os.getenv("ARCHIVE_SYNC_ON_START", "0") == "1"
 # Polling control (optional)
 POLLING_ENABLED = os.getenv("POLLING_ENABLED", "1") != "0"
 
+# Webhook configuration
+RAILWAY_PUBLIC_DOMAIN = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+
 # Performance limits
 DOWNLOAD_CONCURRENCY = int(os.getenv("DOWNLOAD_CONCURRENCY", "2"))
 USER_RATE_LIMIT_SEC = float(os.getenv("USER_RATE_LIMIT_SEC", "2.0"))
