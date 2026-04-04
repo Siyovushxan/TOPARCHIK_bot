@@ -7,6 +7,7 @@ import yt_dlp
 from googleapiclient.discovery import build
 from toparchik_bot.config import (
     DOWNLOAD_DIR,
+    DOWNLOAD_CONCURRENCY,
     YOUTUBE_COOKIES,
     YOUTUBE_COOKIES_B64,
     YOUTUBE_COOKIES_PATH,
@@ -17,6 +18,7 @@ from toparchik_bot.config import (
 
 logger = logging.getLogger(__name__)
 _cookie_warning_emitted = False
+_download_sem = asyncio.Semaphore(max(1, DOWNLOAD_CONCURRENCY))
 
 
 def _warn_once(message: str):
@@ -446,7 +448,8 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
             raise Exception(msg)
 
     loop = asyncio.get_event_loop()
-    info, final_path = await loop.run_in_executor(None, _download)
+    async with _download_sem:
+        info, final_path = await loop.run_in_executor(None, _download)
 
     # Backup: boshqa kengaytmalarni tekshirish
     if not os.path.exists(final_path):

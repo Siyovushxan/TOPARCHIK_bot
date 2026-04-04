@@ -56,6 +56,10 @@ ARCHIVE_SYNC_ON_START = os.getenv("ARCHIVE_SYNC_ON_START", "0") == "1"
 # Polling control (optional)
 POLLING_ENABLED = os.getenv("POLLING_ENABLED", "1") != "0"
 
+# Performance limits
+DOWNLOAD_CONCURRENCY = int(os.getenv("DOWNLOAD_CONCURRENCY", "2"))
+USER_RATE_LIMIT_SEC = float(os.getenv("USER_RATE_LIMIT_SEC", "2.0"))
+
 # Directories
 DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
 CACHE_FILE = os.path.join(BASE_DIR, "cache_index.json")

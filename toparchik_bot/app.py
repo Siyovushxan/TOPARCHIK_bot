@@ -1,4 +1,5 @@
 import asyncio
+import time
 import logging
 import os
 import re
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher()
 sync_lock = asyncio.Lock()
+_user_last_request = {}
 
 # --- Keyboards ---
 
@@ -96,6 +98,20 @@ def is_admin(user_id: int | None) -> bool:
 def _is_message_missing_error(exc: Exception) -> bool:
     text = str(exc).lower()
     return "message to forward not found" in text or "message_id_invalid" in text or "message not found" in text
+
+
+def _rate_limit_ok(user_id: int | None):
+    if not user_id:
+        return True, 0
+    now = time.monotonic()
+    last = _user_last_request.get(user_id, 0.0)
+    limit = float(config.USER_RATE_LIMIT_SEC or 0)
+    if limit <= 0:
+        return True, 0
+    if now - last < limit:
+        return False, limit - (now - last)
+    _user_last_request[user_id] = now
+    return True, 0
 
 WELCOME_TEXT = (
     "<b>✨ TOPARCHIK AI - Universal Media App</b>\n\n"
@@ -472,6 +488,10 @@ async def handle_text(message: types.Message, override_text: str = None):
 
     # 4. Standart media va qidiruv logikasi
     if "youtube.com" in text or "youtu.be" in text or "tiktok.com" in text or "instagram.com" in text:
+        ok, wait_for = _rate_limit_ok(message.from_user.id if message.from_user else None)
+        if not ok:
+            await message.answer(f"Juda tez so'rov yuboryapsiz. {wait_for:.1f} soniya kuting.")
+            return
         wait_msg = await message.answer("⏳ Media yuklab olinmoqda...")
         try:
             info, file_path = await download_media(text, message.chat.id)
@@ -563,6 +583,10 @@ async def handle_text(message: types.Message, override_text: str = None):
 @dp.callback_query(F.data.startswith("dl_"))
 async def process_download(callback: types.CallbackQuery):
     video_id = callback.data.split("_", 1)[1]
+    ok, wait_for = _rate_limit_ok(callback.from_user.id if callback.from_user else None)
+    if not ok:
+        await callback.answer(f"Juda tez so'rov. {wait_for:.1f}s kuting.", show_alert=True)
+        return
     wait_msg = await callback.message.answer("⏳ Audio yuklab olinmoqda...")
     await callback.answer()
 
