@@ -144,13 +144,33 @@ def build_youtube_profile() -> dict:
         "include_hls_manifest": True,
     }
     
+    def _parse_po_tokens(raw_value: str) -> list[str]:
+        tokens = [t.strip() for t in raw_value.split(",") if t.strip()]
+        expanded: list[str] = []
+        for token in tokens:
+            # If token already specifies a client (e.g. web.gvs+TOKEN, web.player+TOKEN), keep it.
+            if "+" in token:
+                expanded.append(token)
+                continue
+            # Default fallback: attach to common clients.
+            expanded.append(f"web+{token}")
+            expanded.append(f"ios+{token}")
+        # Deduplicate while preserving order
+        seen = set()
+        result = []
+        for token in expanded:
+            if token in seen:
+                continue
+            seen.add(token)
+            result.append(token)
+        return result
+
     # PO Token va Visitor Data ni formatlash
     if YOUTUBE_PO_TOKEN:
-        youtube_args["po_token"] = [
-            f"web+{YOUTUBE_PO_TOKEN}",
-            f"ios+{YOUTUBE_PO_TOKEN}",
-            YOUTUBE_PO_TOKEN
-        ]
+        youtube_args["po_token"] = _parse_po_tokens(YOUTUBE_PO_TOKEN)
+        # PO token odatda web client bilan yaxshi ishlaydi
+        youtube_args["player_client"] = ["web"]
+        youtube_args["player_skip"] = ["webpage", "configs"]
     
     if YOUTUBE_VISITOR_DATA:
         youtube_args["visitor_data"] = [YOUTUBE_VISITOR_DATA]
