@@ -412,12 +412,65 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
             return _info, final_filename
 
+    def _extract_info():
+        info_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extractor_args": opts.get("extractor_args", {}),
+            "ignoreerrors": False,
+            "no_color": True,
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+            "allow_unplayable_formats": True,
+        }
+        cookie_path = get_cookies_path()
+        if cookie_path:
+            info_opts["cookiefile"] = cookie_path
+        with yt_dlp.YoutubeDL(info_opts) as ydl:
+            return ydl.extract_info(url, download=False)
+
+    def _pick_format_id(info):
+        formats = info.get("formats") or []
+        if not formats:
+            return None
+        if audio_only:
+            audio_formats = [f for f in formats if f.get("acodec") and f.get("acodec") != "none"]
+            if not audio_formats:
+                return None
+            audio_formats.sort(
+                key=lambda f: (
+                    f.get("abr") or f.get("tbr") or 0,
+                    f.get("filesize") or f.get("filesize_approx") or 0,
+                ),
+                reverse=True,
+            )
+            return audio_formats[0].get("format_id")
+        formats.sort(
+            key=lambda f: (
+                f.get("height") or 0,
+                f.get("tbr") or 0,
+            ),
+            reverse=True,
+        )
+        return formats[0].get("format_id")
+
     def _download():
         try:
             return _download_with_opts(opts)
         except Exception as e:
             msg = str(e)
             if "Requested format is not available" in msg and audio_only:
+                try:
+                    info = _extract_info()
+                    format_id = _pick_format_id(info) if info else None
+                    if format_id:
+                        direct_opts = dict(opts)
+                        direct_opts["format"] = format_id
+                        direct_opts["allow_unplayable_formats"] = True
+                        direct_opts.pop("format_sort", None)
+                        return _download_with_opts(direct_opts)
+                except Exception as e_info:
+                    msg = str(e_info)
                 fallback_variants = [
                     {
                         "format": "bestaudio[ext=m4a]/bestaudio/best",
