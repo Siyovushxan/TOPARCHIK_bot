@@ -418,14 +418,24 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         except Exception as e:
             msg = str(e)
             if "Requested format is not available" in msg and audio_only:
-                # Retry with a more permissive format
+                # Retry with a more permissive format + alternate clients
                 fallback_opts = dict(opts)
                 fallback_opts["format"] = "bestaudio/best"
                 fallback_opts.pop("format_sort", None)
+                fallback_opts["extractor_args"] = {"youtube": {"player_client": ["web", "tv_embedded", "ios"]}}
                 try:
                     return _download_with_opts(fallback_opts)
                 except Exception as e2:
                     msg = str(e2)
+                # Final fallback: download best (video+audio) and extract audio
+                final_opts = dict(opts)
+                final_opts["format"] = "best/bestvideo+bestaudio"
+                final_opts.pop("format_sort", None)
+                final_opts["extractor_args"] = {"youtube": {"player_client": ["web", "tv_embedded", "ios"]}}
+                try:
+                    return _download_with_opts(final_opts)
+                except Exception as e3:
+                    msg = str(e3)
             if "Sign in to confirm" in msg or "bot" in msg.lower():
                 msg = (
                     "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
