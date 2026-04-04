@@ -432,11 +432,11 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
             return _info, final_filename
 
-    def _extract_info():
+    def _extract_info(extractor_args_override: dict | None = None):
         info_opts = {
             "quiet": True,
             "no_warnings": True,
-            "extractor_args": opts.get("extractor_args", {}),
+            "extractor_args": extractor_args_override or opts.get("extractor_args", {}),
             "ignoreerrors": False,
             "no_color": True,
             "geo_bypass": True,
@@ -480,17 +480,27 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         except Exception as e:
             msg = str(e)
             if "Requested format is not available" in msg and audio_only:
-                try:
-                    info = _extract_info()
-                    format_id = _pick_format_id(info) if info else None
-                    if format_id:
-                        direct_opts = dict(opts)
-                        direct_opts["format"] = format_id
-                        direct_opts["allow_unplayable_formats"] = True
-                        direct_opts.pop("format_sort", None)
-                        return _download_with_opts(direct_opts)
-                except Exception as e_info:
-                    msg = str(e_info)
+                extractor_variants = [
+                    {"youtube": {"player_client": ["web"]}},
+                    {"youtube": {"player_client": ["android_music", "android", "ios"]}},
+                    {"youtube": {"player_client": ["mweb", "tv_embedded"]}},
+                    {},
+                ]
+
+                for extractor_args in extractor_variants:
+                    try:
+                        info = _extract_info(extractor_args if extractor_args else None)
+                        format_id = _pick_format_id(info) if info else None
+                        if format_id:
+                            direct_opts = dict(opts)
+                            direct_opts["format"] = format_id
+                            direct_opts["allow_unplayable_formats"] = True
+                            direct_opts.pop("format_sort", None)
+                            if extractor_args:
+                                direct_opts["extractor_args"] = extractor_args
+                            return _download_with_opts(direct_opts)
+                    except Exception as e_info:
+                        msg = str(e_info)
                 fallback_variants = [
                     {
                         "format": "bestaudio[ext=m4a]/bestaudio/best",
