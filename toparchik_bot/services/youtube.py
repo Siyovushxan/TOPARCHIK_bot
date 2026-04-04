@@ -214,6 +214,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     """yt-dlp uchun optimallashtirilgan parametrlar."""
     cookie_path = get_cookies_path()
     profile = build_youtube_profile()
+    extractor_args = profile.get("extractor_args", {})
 
     opts = {
         "outtmpl": outtmpl,
@@ -223,7 +224,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "extractor_retries": 15,
         "retries": 15,
         "fragment_retries": 15,
-        "extractor_args": profile.get("extractor_args", {}),
+        "extractor_args": extractor_args,
         "ignoreerrors": False,
         "no_color": True,
         "geo_bypass": True,
@@ -251,6 +252,11 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     # Cookie faqat mavjud bo'lganda
     if cookie_path:
         opts["cookiefile"] = cookie_path
+        # Visitor data cookies bilan birga ishlaganda formatlar yopilib qolishi mumkin
+        if "youtube" in opts["extractor_args"] and "visitor_data" in opts["extractor_args"]["youtube"]:
+            opts["extractor_args"] = dict(opts["extractor_args"])
+            opts["extractor_args"]["youtube"] = dict(opts["extractor_args"]["youtube"])
+            opts["extractor_args"]["youtube"].pop("visitor_data", None)
     if YTDLP_PROXY:
         opts["proxy"] = YTDLP_PROXY
 
@@ -475,6 +481,10 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         cookie_path = get_cookies_path()
         if cookie_path:
             info_opts["cookiefile"] = cookie_path
+            if "youtube" in info_opts["extractor_args"] and "visitor_data" in info_opts["extractor_args"]["youtube"]:
+                info_opts["extractor_args"] = dict(info_opts["extractor_args"])
+                info_opts["extractor_args"]["youtube"] = dict(info_opts["extractor_args"]["youtube"])
+                info_opts["extractor_args"]["youtube"].pop("visitor_data", None)
         if YTDLP_PROXY:
             info_opts["proxy"] = YTDLP_PROXY
         with yt_dlp.YoutubeDL(info_opts) as ydl:
