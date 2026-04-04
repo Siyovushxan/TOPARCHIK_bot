@@ -35,106 +35,7 @@ def _warn_once(message: str):
 
 
 def get_cookies_path():
-    """Cookie faylini tayyorlaydi."""
-    raw = None
-    if YOUTUBE_COOKIES_B64:
-        raw = YOUTUBE_COOKIES_B64.strip()
-    elif YOUTUBE_COOKIES:
-        raw = YOUTUBE_COOKIES.strip()
-    elif YOUTUBE_COOKIES_PATH:
-        raw = YOUTUBE_COOKIES_PATH.strip()
-
-    # If both env vars are missing, try a default local cookie file.
-    default_cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-    if not raw and os.path.isfile(default_cookie_path):
-        logger.info(f"YOUTUBE_COOKIES topilmadi, lekin default cookie fayl topildi: {default_cookie_path}")
-        return default_cookie_path
-
-    if not raw:
-        _warn_once(
-            "YOUTUBE_COOKIES va YOUTUBE_COOKIES_PATH o'rnatilmagan — cookie ishlatilmaydi. "
-            "Railway yoki hosting muhitingizga bu qiymatni qo'shing."
-        )
-        return None
-
-    # .env dagi qo'shtirnoqlarni tozalash
-    if (raw.startswith('"') and raw.endswith('"')) or \
-       (raw.startswith("'") and raw.endswith("'")):
-        raw = raw[1:-1].strip()
-
-    if YOUTUBE_COOKIES_B64:
-        try:
-            decoded = base64.b64decode(raw, validate=True).decode("utf-8")
-            raw = decoded.strip()
-            logger.info("YOUTUBE_COOKIES_B64 decoded successfully.")
-        except Exception as exc:
-            logger.error(f"YOUTUBE_COOKIES_B64 decode error: {exc}")
-            return None
-    else:
-        # If base64 accidentally placed into YOUTUBE_COOKIES, try to decode once.
-        if ("\n" not in raw and "\t" not in raw and len(raw) > 200 and
-                re.fullmatch(r"[A-Za-z0-9+/=]+", raw or "")):
-            try:
-                decoded = base64.b64decode(raw, validate=True).decode("utf-8")
-                if "Netscape" in decoded or ".youtube.com" in decoded:
-                    raw = decoded.strip()
-                    logger.info("YOUTUBE_COOKIES auto-decoded from base64.")
-            except Exception:
-                pass
-
-    # Agar fayl yo'li bo'lsa (yoki faqat fayl nomi berilgan bo'lsa)
-    candidate_paths = [raw]
-    if raw and not os.path.isabs(raw):
-        candidate_paths.extend([
-            os.path.join(DOWNLOAD_DIR, raw),
-            os.path.join(os.getcwd(), raw)
-        ])
-
-    for candidate in candidate_paths:
-        if os.path.isfile(candidate):
-            size = os.path.getsize(candidate)
-            if size < 500:
-                logger.error(f"Cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
-                return None
-            logger.info(f"Cookie fayldan o'qildi: {candidate} ({size} bayt)")
-            return candidate
-
-    # Agar Netscape cookie mazmuni bo'lsa
-    if "Netscape" in raw or "HTTP Cookie File" in raw or ".youtube.com" in raw:
-        cookie_path = os.path.join(DOWNLOAD_DIR, "youtube_cookies.txt")
-
-        # Header qo'shish (agar yo'q bo'lsa)
-        if not raw.startswith("# Netscape"):
-            raw = "# Netscape HTTP Cookie File\n" + raw
-
-        # Mavjud bo'lsa va mazmuni bir xil bo'lsa — qaytadan yozmaymiz
-        if os.path.exists(cookie_path):
-            with open(cookie_path, "r", encoding="utf-8") as f:
-                if f.read() == raw:
-                    size = os.path.getsize(cookie_path)
-                    if size < 500:
-                        logger.error(f"Mavjud cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
-                        return None
-                    return cookie_path
-
-        with open(cookie_path, "w", encoding="utf-8") as f:
-            f.write(raw)
-
-        size = os.path.getsize(cookie_path)
-        if size < 500:
-            logger.error(f"Yozilgan cookie fayl juda kichik ({size} bayt) — yaroqsiz!")
-            return None
-
-        logger.info(f"Cookie yozildi: {cookie_path} ({size} bayt)")
-        return cookie_path
-
-    if "\n" not in raw and "\t" not in raw:
-        _warn_once(
-            "YOUTUBE_COOKIES noto'g'ri ko'rinadi: secret ichiga fayl nomi emas, "
-            "cookies.txt faylining to'liq matni yoki base64 ko'rinishi kirishi kerak."
-        )
-
-    _warn_once("YOUTUBE_COOKIES noto'g'ri format — cookie siz urinib ko'riladi.")
+    """Cookie faylini tayyorlaydi - hozir ishlatilmaydi."""
     return None
 
 
@@ -211,19 +112,15 @@ def _parse_iso8601_duration(duration: str) -> int:
 
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
-    """yt-dlp uchun optimallashtirilgan parametrlar."""
-    cookie_path = get_cookies_path()
-
+    """yt-dlp uchun minimal va tezkor parametrlar."""
+    
     opts = {
         "outtmpl": outtmpl,
-        "quiet": True,
+        "quiet": False,
         "noprogress": True,
-        "no_warnings": True,
-        "extractor_retries": 3,
-        "retries": 3,
-        "fragment_retries": 3,
-        "socket_timeout": 15,
-        "ratelimit": 500000,
+        "no_warnings": False,
+        "socket_timeout": 10,
+        "ratelimit": 1000000,
         "ignoreerrors": False,
         "no_color": True,
         "skip_unavailable_fragments": True,
@@ -231,17 +128,10 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ),
-        "http_headers": {
-            "Accept-Language": "en-US,en;q=0.9",
-        },
         "postprocessor_args": {
             "ffmpeg": ["-threads", "0", "-preset", "veryfast"]
         },
     }
-
-    # Cookie faqat mavjud bo'lganda
-    if cookie_path:
-        opts["cookiefile"] = cookie_path
 
     if YTDLP_PROXY:
         opts["proxy"] = YTDLP_PROXY
