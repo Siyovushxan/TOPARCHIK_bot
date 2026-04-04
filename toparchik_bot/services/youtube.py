@@ -138,8 +138,8 @@ def build_youtube_profile() -> dict:
     youtube_args: dict = {
         "player_client": ["android_music", "ios", "android", "mweb"], # android_music eng barqaror profil
         "force_ipv4": True,
-        "include_dash_manifest": False,
-        "include_hls_manifest": False,
+        "include_dash_manifest": True,
+        "include_hls_manifest": True,
     }
     
     # PO Token va Visitor Data ni formatlash
