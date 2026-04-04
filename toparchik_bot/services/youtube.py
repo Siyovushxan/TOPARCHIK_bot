@@ -213,56 +213,42 @@ def _parse_iso8601_duration(duration: str) -> int:
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     """yt-dlp uchun optimallashtirilgan parametrlar."""
     cookie_path = get_cookies_path()
-    profile = build_youtube_profile()
-    extractor_args = profile.get("extractor_args", {})
 
     opts = {
         "outtmpl": outtmpl,
         "quiet": True,
         "noprogress": True,
         "no_warnings": True,
-        "extractor_retries": 15,
-        "retries": 15,
-        "fragment_retries": 15,
-        "extractor_args": extractor_args,
+        "extractor_retries": 3,
+        "retries": 3,
+        "fragment_retries": 3,
+        "socket_timeout": 15,
+        "ratelimit": 500000,
         "ignoreerrors": False,
         "no_color": True,
-        "geo_bypass": True,
-        "nocheckcertificate": True,
-        "concurrent_fragment_downloads": 10,  # Tezlikni oshirish uchun
-        "socket_timeout": 30,
-        "allow_unplayable_formats": True,
-        "postprocessor_args": {
-            "ffmpeg": [
-                "-threads", "0",        # Barcha CPU yadrolaridan foydalanish
-                "-preset", "veryfast"   # Tezkor konvertatsiya
-            ]
-        },
-        # Browser impersonation (Requires recent yt-dlp)
+        "skip_unavailable_fragments": True,
         "user_agent": (
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ),
         "http_headers": {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
+        },
+        "postprocessor_args": {
+            "ffmpeg": ["-threads", "0", "-preset", "veryfast"]
         },
     }
 
     # Cookie faqat mavjud bo'lganda
     if cookie_path:
         opts["cookiefile"] = cookie_path
-        # Visitor data cookies bilan birga ishlaganda formatlar yopilib qolishi mumkin
-        if "youtube" in opts["extractor_args"] and "visitor_data" in opts["extractor_args"]["youtube"]:
-            opts["extractor_args"] = dict(opts["extractor_args"])
-            opts["extractor_args"]["youtube"] = dict(opts["extractor_args"]["youtube"])
-            opts["extractor_args"]["youtube"].pop("visitor_data", None)
+
     if YTDLP_PROXY:
         opts["proxy"] = YTDLP_PROXY
 
     if audio_only:
         opts.update({
-            "format": "bestaudio/best",
+            "format": "140/251/250/18/22/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
@@ -271,7 +257,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         })
     else:
         opts.update({
-            "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best",
+            "format": "18/22/best",
         })
 
     return opts
@@ -521,131 +507,23 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         except Exception as e:
             msg = str(e)
             if "Requested format is not available" in msg and audio_only:
-                extractor_variants = [
-                    {"youtube": {"player_client": ["web"]}},
-                    {"youtube": {"player_client": ["android_music", "android", "ios"]}},
-                    {"youtube": {"player_client": ["mweb", "tv_embedded"]}},
-                    {},
-                ]
-
-                for extractor_args in extractor_variants:
-                    try:
-                        info = _extract_info(extractor_args if extractor_args else None)
-                        format_id = _pick_format_id(info) if info else None
-                        if format_id:
-                            direct_opts = dict(opts)
-                            direct_opts["format"] = format_id
-                            direct_opts["allow_unplayable_formats"] = True
-                            direct_opts.pop("format_sort", None)
-                            if extractor_args is not None:
-                                direct_opts["extractor_args"] = extractor_args
-                            return _download_with_opts(direct_opts)
-                    except Exception as e_info:
-                        msg = str(e_info)
-
-                # Final attempt: try music.youtube.com for audio-only
-                if vid:
-                    music_url = f"https://music.youtube.com/watch?v={vid}"
-                    try:
-                        music_opts = dict(opts)
-                        music_opts["format"] = "bestaudio/best"
-                        music_opts.pop("format_sort", None)
-                        return _download_with_opts(music_opts, music_url)
-                    except Exception as e_music:
-                        msg = str(e_music)
-                fallback_variants = [
-                    {
-                        "format": "bestaudio[ext=m4a]/bestaudio/best",
-                        "extractor_args": {"youtube": {"player_client": ["web"]}},
-                        "name": "bestaudio[m4a] + web client",
-                    },
-                    {
-                        "format": "140/251/bestaudio/best",
-                        "extractor_args": {"youtube": {"player_client": ["web"]}},
-                        "name": "format 140/251 + web client",
-                    },
-                    {
-                        "format": "bestaudio/best",
-                        "extractor_args": {"youtube": {"player_client": ["android_music"]}},
-                        "name": "bestaudio + android_music client",
-                    },
-                    {
-                        "format": "bestaudio/best",
-                        "extractor_args": {"youtube": {"player_client": ["ios"]}},
-                        "name": "bestaudio + ios client",
-                    },
-                    {
-                        "format": "bestaudio/best",
-                        "extractor_args": {"youtube": {"player_client": ["mweb", "tv_embedded"]}},
-                        "name": "bestaudio + mweb/tv_embedded",
-                    },
-                    {
-                        "format": "bestaudio/best",
-                        "extractor_args": {},
-                        "name": "bestaudio (no specific extractor)",
-                    },
-                    {
-                        "format": "best[height<=360]",
-                        "extractor_args": {"youtube": {"player_client": ["web"]}},
-                        "name": "best[height<=360] + web",
-                    },
-                    {
-                        "format": "best",
-                        "extractor_args": {"youtube": {"player_client": ["web"]}},
-                        "name": "best + web client",
-                    },
-                    {
-                        "format": "best",
-                        "extractor_args": {},
-                        "name": "best (no specific extractor)",
-                    },
-                ]
-
-                for variant in fallback_variants:
-                    fallback_opts = dict(opts)
-                    variant_name = variant.pop("name", "unknown")
-                    fallback_opts.update(variant)
-                    fallback_opts.pop("format_sort", None)
-                    fallback_opts["allow_unplayable_formats"] = True
-                    try:
-                        logger.info(f"Fallback attempt for {vid}: {variant_name}")
-                        return _download_with_opts(fallback_opts)
-                    except Exception as e2:
-                        logger.debug(f"Fallback failed ({variant_name}): {e2}")
-                        msg = str(e2)
-
-                # Last resort: auto-select ANY available format
-                if audio_only:
-                    try:
-                        logger.info(f"Last resort: extracting available formats for {vid}")
-                        info = _extract_info()
-                        if info:
-                            format_id = _pick_format_id(info)
-                            if format_id:
-                                last_resort_opts = dict(opts)
-                                last_resort_opts["format"] = format_id
-                                last_resort_opts.pop("format_sort", None)
-                                last_resort_opts["allow_unplayable_formats"] = True
-                                logger.info(f"Trying auto-selected format: {format_id}")
-                                return _download_with_opts(last_resort_opts)
-                    except Exception as e_last:
-                        logger.debug(f"Last resort format extraction failed: {e_last}")
+                # Simple fallback: try with minimal format selection
+                try:
+                    logger.info(f"Format retry for {vid}: using format 18")
+                    opts_retry = dict(opts)
+                    opts_retry["format"] = "18/22/best"
+                    opts_retry.pop("allow_unplayable_formats", None)
+                    return _download_with_opts(opts_retry)
+                except Exception as e_retry:
+                    msg = str(e_retry)
+                    
             if "Sign in to confirm" in msg or "bot" in msg.lower():
-                msg = (
-                    "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
-                    "Iltimos cookie ni yangilang yoki keyinroq urinib ko'ring."
-                )
+                msg = "YouTube bot tekshiruvi: cookie muammosi. Keyinroq urinib ko'ring."
             elif "format is not available" in msg or "Requested format is not available" in msg:
                 msg = (
-                    "📛 Bu video uchun yuklab olinadigan format topilmadi.\n\n"
-                    "Sabablari:\n"
-                    "• Video YouTube tomonidan cheklangan yoki geografik chegaralangan\n"
-                    "• Age-restricted video bo'lishi mumkin\n"
-                    "• Cookie yoki PO-token eskirgan\n\n"
-                    "Nima qilish:\n"
-                    "1️⃣ Cookie fayli yangilang\n"
-                    "2️⃣ Boshqa YouTube video linkini sinab ko'ring\n"
-                    "3️⃣ Keyinroq yana urinib ko'ring"
+                    "⚠️ Bu video yuklana olmadi. Lekin xavotir olmang:\n\n"
+                    "✅ Boshqa YouTube linkni yuboring.\n"
+                    "🎵 Savangiz saqlangan bo'lsa, arxivdan chiqar olamiz."
                 )
             # Mark video as blocked to reduce noisy retries
             if vid and YTDLP_BLOCK_TTL_SEC > 0:
