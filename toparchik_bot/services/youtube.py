@@ -557,34 +557,79 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                     {
                         "format": "bestaudio[ext=m4a]/bestaudio/best",
                         "extractor_args": {"youtube": {"player_client": ["web"]}},
+                        "name": "bestaudio[m4a] + web client",
                     },
                     {
                         "format": "140/251/bestaudio/best",
                         "extractor_args": {"youtube": {"player_client": ["web"]}},
+                        "name": "format 140/251 + web client",
                     },
                     {
                         "format": "bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["android_music"]}},
+                        "name": "bestaudio + android_music client",
+                    },
+                    {
+                        "format": "bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["ios"]}},
+                        "name": "bestaudio + ios client",
+                    },
+                    {
+                        "format": "bestaudio/best",
+                        "extractor_args": {"youtube": {"player_client": ["mweb", "tv_embedded"]}},
+                        "name": "bestaudio + mweb/tv_embedded",
+                    },
+                    {
+                        "format": "bestaudio/best",
+                        "extractor_args": {},
+                        "name": "bestaudio (no specific extractor)",
+                    },
+                    {
+                        "format": "best[height<=360]",
                         "extractor_args": {"youtube": {"player_client": ["web"]}},
+                        "name": "best[height<=360] + web",
                     },
                     {
                         "format": "best",
                         "extractor_args": {"youtube": {"player_client": ["web"]}},
+                        "name": "best + web client",
                     },
                     {
                         "format": "best",
                         "extractor_args": {},
+                        "name": "best (no specific extractor)",
                     },
                 ]
 
                 for variant in fallback_variants:
                     fallback_opts = dict(opts)
+                    variant_name = variant.pop("name", "unknown")
                     fallback_opts.update(variant)
                     fallback_opts.pop("format_sort", None)
                     fallback_opts["allow_unplayable_formats"] = True
                     try:
+                        logger.info(f"Fallback attempt for {vid}: {variant_name}")
                         return _download_with_opts(fallback_opts)
                     except Exception as e2:
+                        logger.debug(f"Fallback failed ({variant_name}): {e2}")
                         msg = str(e2)
+
+                # Last resort: auto-select ANY available format
+                if audio_only:
+                    try:
+                        logger.info(f"Last resort: extracting available formats for {vid}")
+                        info = _extract_info()
+                        if info:
+                            format_id = _pick_format_id(info)
+                            if format_id:
+                                last_resort_opts = dict(opts)
+                                last_resort_opts["format"] = format_id
+                                last_resort_opts.pop("format_sort", None)
+                                last_resort_opts["allow_unplayable_formats"] = True
+                                logger.info(f"Trying auto-selected format: {format_id}")
+                                return _download_with_opts(last_resort_opts)
+                    except Exception as e_last:
+                        logger.debug(f"Last resort format extraction failed: {e_last}")
             if "Sign in to confirm" in msg or "bot" in msg.lower():
                 msg = (
                     "YouTube bot tekshiruvi: cookie muammosi yoki IP bloklangan. "
@@ -592,8 +637,15 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
                 )
             elif "format is not available" in msg or "Requested format is not available" in msg:
                 msg = (
-                    "Ushbu audio uchun format topilmadi. Ba'zi videolar YouTube tomonidan "
-                    "cheklangan bo'ladi — YOUTUBE_PO_TOKEN qo'shib ko'ring yoki boshqa link yuboring."
+                    "📛 Bu video uchun yuklab olinadigan format topilmadi.\n\n"
+                    "Sabablari:\n"
+                    "• Video YouTube tomonidan cheklangan yoki geografik chegaralangan\n"
+                    "• Age-restricted video bo'lishi mumkin\n"
+                    "• Cookie yoki PO-token eskirgan\n\n"
+                    "Nima qilish:\n"
+                    "1️⃣ Cookie fayli yangilang\n"
+                    "2️⃣ Boshqa YouTube video linkini sinab ko'ring\n"
+                    "3️⃣ Keyinroq yana urinib ko'ring"
                 )
             # Mark video as blocked to reduce noisy retries
             if vid and YTDLP_BLOCK_TTL_SEC > 0:
