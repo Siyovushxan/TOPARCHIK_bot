@@ -9,6 +9,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.filters import Command, CommandStart
 from aiogram.types import BotCommand, WebAppInfo, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, InputFile, FSInputFile, Message
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from urllib.parse import quote_plus, unquote_plus
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 
@@ -897,7 +898,8 @@ async def handle_webapp(request):
 async def handle_root(request):
     return await handle_webapp(request)
 
-async def start_health_server():
+async def build_web_app() -> web.Application:
+    """Build and return the aiohttp web application with all routes registered."""
     app = web.Application()
     app.router.add_get("/", handle_root)
     app.router.add_get("/webapp", handle_root)
@@ -915,26 +917,12 @@ async def start_health_server():
     app.router.add_get("/api/search", handle_api_search)
     app.router.add_get("/api/audio/{file_id}", handle_api_audio)
     app.router.add_post("/api/play/{song_id}", handle_api_play)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 7860))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logger.info(f"Health check server started on port {port}")
+    return app
+
 
 async def main():
-    logger.info("Bot v2.0 start polling...")
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
-    # Eski sessiyalarni tozalash (tarmoq tayyor bo'lmasa — davom etamiz)
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info("Webhook o'chirildi.")
-    except Exception as e:
-        logger.warning(f"Webhook o'chirishda xato (davom etamiz): {e}")
-
-    # Start health check server
-    await start_health_server()
 
     # Optional: auto-sync archive cache on startup
     if config.ARCHIVE_SYNC_ON_START:
@@ -945,15 +933,69 @@ async def main():
         BotCommand(command="start", description="Botni ishga tushirish"),
         BotCommand(command="help", description="Yordam olish")
     ])
-    
-    # Start polling
+
+    port = int(os.environ.get("PORT", 8080))
+
+    # --- Webhook mode (default for multi-replica deployments) ---
+    if config.RAILWAY_PUBLIC_DOMAIN and not config.POLLING_ENABLED:
+        webhook_url = f"https://{config.RAILWAY_PUBLIC_DOMAIN}{config.WEBHOOK_PATH}"
+        logger.info(f"Bot v2.0 starting in webhook mode: {webhook_url}")
+
+        # Register the webhook with Telegram
+        await bot.set_webhook(
+            url=webhook_url,
+            secret_token=config.WEBHOOK_SECRET or None,
+            drop_pending_updates=True,
+        )
+        logger.info("Telegram webhook registered.")
+
+        app = await build_web_app()
+
+        # Mount the aiogram webhook handler onto the aiohttp app
+        webhook_handler = SimpleRequestHandler(
+            dispatcher=dp,
+            bot=bot,
+            secret_token=config.WEBHOOK_SECRET or None,
+        )
+        webhook_handler.register(app, path=config.WEBHOOK_PATH)
+
+        # Wire aiogram startup/shutdown lifecycle into aiohttp
+        setup_application(app, dp, bot=bot)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        logger.info(f"Webhook server listening on port {port}")
+
+        # Keep running until cancelled
+        await asyncio.Event().wait()
+        return
+
+    # --- Polling mode (single-instance / local development) ---
+    logger.info("Bot v2.0 starting in polling mode...")
+
+    # Remove any existing webhook before polling
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Existing webhook removed.")
+    except Exception as e:
+        logger.warning(f"Could not remove webhook (continuing): {e}")
+
+    # Start the health-check / API server alongside polling
+    app = await build_web_app()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logger.info(f"Health check server started on port {port}")
+
     if not config.POLLING_ENABLED:
-        logger.warning("POLLING_ENABLED=0 — polling to'xtatildi (faqat webapp ishlaydi).")
+        logger.warning("POLLING_ENABLED=0 — polling disabled (webapp only).")
         await asyncio.Event().wait()
         return
 
     await dp.start_polling(bot)
-
 
 
 if __name__ == "__main__":
