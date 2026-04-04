@@ -35,7 +35,39 @@ def _warn_once(message: str):
 
 
 def get_cookies_path():
-    """Cookie faylini tayyorlaydi - hozir ishlatilmaydi."""
+    """Cookie faylini tayyorlaydi - YouTube bot tekshiruvi uchun."""
+    raw = YOUTUBE_COOKIES_B64 or YOUTUBE_COOKIES or YOUTUBE_COOKIES_PATH
+    
+    if not raw:
+        return None
+
+    try:
+        if YOUTUBE_COOKIES_B64:
+            decoded = base64.b64decode(raw.strip(), validate=True).decode("utf-8")
+            raw = decoded.strip()
+    except Exception:
+        pass
+
+    candidate_paths = [raw]
+    if raw and not os.path.isabs(raw):
+        candidate_paths.extend([
+            os.path.join(DOWNLOAD_DIR, raw),
+            os.path.join(os.getcwd(), raw)
+        ])
+
+    for candidate in candidate_paths:
+        if os.path.isfile(candidate) and os.path.getsize(candidate) > 100:
+            return candidate
+
+    # Agar inline cookie bo'lsa
+    if "Netscape" in raw or ".youtube.com" in raw:
+        cookie_path = os.path.join(DOWNLOAD_DIR, "yt_cookies.txt")
+        if not raw.startswith("# Netscape"):
+            raw = "# Netscape HTTP Cookie File\n" + raw
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            f.write(raw)
+        return cookie_path if os.path.getsize(cookie_path) > 100 else None
+
     return None
 
 
@@ -113,6 +145,7 @@ def _parse_iso8601_duration(duration: str) -> int:
 
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     """yt-dlp uchun minimal va tezkor parametrlar."""
+    cookie_path = get_cookies_path()
     
     opts = {
         "outtmpl": outtmpl,
@@ -128,10 +161,15 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ),
+        "js_runtimes": ["node"],  # Node.js orqali JavaScript bajariladi
         "postprocessor_args": {
             "ffmpeg": ["-threads", "0", "-preset", "veryfast"]
         },
     }
+
+    if cookie_path:
+        opts["cookiefile"] = cookie_path
+        logger.info(f"Using cookies from: {cookie_path}")
 
     if YTDLP_PROXY:
         opts["proxy"] = YTDLP_PROXY
