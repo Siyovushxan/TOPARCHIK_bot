@@ -828,20 +828,32 @@ async def handle_api_audio(request):
         return web.Response(status=404, text="File not found")
 
     file_url = f"https://api.telegram.org/file/bot{config.BOT_TOKEN}/{file.file_path}"
+    range_header = request.headers.get("Range")
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(file_url) as resp:
-                if resp.status != 200:
+            upstream_headers = {}
+            if range_header:
+                upstream_headers["Range"] = range_header
+
+            async with session.get(file_url, headers=upstream_headers) as resp:
+                if resp.status not in (200, 206):
                     logger.error(f"Telegram file fetch failed: {resp.status}")
-                    return web.Response(status=502, text="Upstream error")
+                    return web.Response(status=resp.status, text="Upstream error")
 
                 headers = {
                     "Content-Type": resp.headers.get("Content-Type", "audio/mpeg"),
                     "Cache-Control": "public, max-age=3600",
+                    "Accept-Ranges": "bytes",
                 }
+                content_range = resp.headers.get("Content-Range")
+                content_length = resp.headers.get("Content-Length")
+                if content_range:
+                    headers["Content-Range"] = content_range
+                if content_length:
+                    headers["Content-Length"] = content_length
 
-                stream = web.StreamResponse(status=200, headers=headers)
+                stream = web.StreamResponse(status=resp.status, headers=headers)
                 await stream.prepare(request)
 
                 async for chunk in resp.content.iter_chunked(65536):
