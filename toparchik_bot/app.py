@@ -1,4 +1,5 @@
 import asyncio
+import signal
 import time
 import logging
 import os
@@ -968,8 +969,16 @@ async def main():
         await site.start()
         logger.info(f"Webhook server listening on port {port}")
 
-        # Keep running until cancelled
-        await asyncio.Event().wait()
+        # Keep running until a shutdown signal is received
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, stop_event.set)
+
+        await stop_event.wait()
+        logger.info("Shutdown signal received, stopping webhook server...")
+        await runner.cleanup()
+        await bot.session.close()
         return
 
     # --- Polling mode (single-instance / local development) ---
@@ -992,7 +1001,15 @@ async def main():
 
     if not config.POLLING_ENABLED:
         logger.warning("POLLING_ENABLED=0 — polling disabled (webapp only).")
-        await asyncio.Event().wait()
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, stop_event.set)
+
+        await stop_event.wait()
+        logger.info("Shutdown signal received, stopping webapp server...")
+        await runner.cleanup()
+        await bot.session.close()
         return
 
     await dp.start_polling(bot)
