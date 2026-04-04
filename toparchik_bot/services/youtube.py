@@ -14,7 +14,8 @@ from toparchik_bot.config import (
     YOUTUBE_COOKIES_PATH,
     YOUTUBE_PO_TOKEN,
     YOUTUBE_VISITOR_DATA,
-    YOUTUBE_API_KEY
+    YOUTUBE_API_KEY,
+    YTDLP_PROXY
 )
 
 logger = logging.getLogger(__name__)
@@ -245,6 +246,8 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     # Cookie faqat mavjud bo'lganda
     if cookie_path:
         opts["cookiefile"] = cookie_path
+    if YTDLP_PROXY:
+        opts["proxy"] = YTDLP_PROXY
 
     if audio_only:
         opts.update({
@@ -380,6 +383,8 @@ def _search_yt_dlp_sync(query: str, max_results: int = 10):
         "no_warnings": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
     }
+    if YTDLP_PROXY:
+        ydl_opts["proxy"] = YTDLP_PROXY
     if cookie_path:
         ydl_opts["cookiefile"] = cookie_path
 
@@ -456,6 +461,8 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
         cookie_path = get_cookies_path()
         if cookie_path:
             info_opts["cookiefile"] = cookie_path
+        if YTDLP_PROXY:
+            info_opts["proxy"] = YTDLP_PROXY
         with yt_dlp.YoutubeDL(info_opts) as ydl:
             return ydl.extract_info(url, download=False)
 

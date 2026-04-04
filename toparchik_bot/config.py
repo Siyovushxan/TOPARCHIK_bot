@@ -28,6 +28,7 @@ YOUTUBE_COOKIES_PATH = os.getenv("YOUTUBE_COOKIES_PATH")
 YOUTUBE_PO_TOKEN = os.getenv("YOUTUBE_PO_TOKEN")
 YOUTUBE_VISITOR_DATA = os.getenv("YOUTUBE_VISITOR_DATA")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+YTDLP_PROXY = os.getenv("YTDLP_PROXY") or os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
 
 # Web App
 WEB_APP_URL = os.getenv("WEB_APP_URL", "")
