@@ -161,7 +161,6 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         ),
-        "js_runtimes": ["node"],  # Node.js orqali JavaScript bajariladi
         "postprocessor_args": {
             "ffmpeg": ["-threads", "0", "-preset", "veryfast"]
         },
@@ -249,7 +248,7 @@ async def search_youtube(query: str, max_results: int = 10):
 
     def _search_api():
         try:
-            youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+            youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY, cache_discovery=False)
             request = youtube.search().list(
                 q=query,
                 part="id,snippet",
