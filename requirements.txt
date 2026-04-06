@@ -10,3 +10,4 @@ python-docx
 pdf2docx
 python-magic
 google-api-python-client
+google-cloud-firestore

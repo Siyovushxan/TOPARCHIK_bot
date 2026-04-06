@@ -24,9 +24,9 @@ def setup_routers(dp: Dispatcher):
     dp.include_router(media.router)
 
 async def on_startup(bot: Bot):
-    # Webhook setting (if Railway is used)
-    if config.RAILWAY_PUBLIC_DOMAIN:
-        webhook_url = f"https://{config.RAILWAY_PUBLIC_DOMAIN}{config.WEBHOOK_PATH}"
+    # Webhook setting (if Cloud Run/Railway is used)
+    if config.PUBLIC_DOMAIN:
+        webhook_url = f"https://{config.PUBLIC_DOMAIN}{config.WEBHOOK_PATH}"
         logger.info(f"Setting webhook to: {webhook_url}")
         await bot.set_webhook(url=webhook_url, secret_token=config.WEBHOOK_SECRET)
     else:
@@ -52,7 +52,7 @@ async def main():
     app.router.add_get("/api/search", webapp_handlers.handle_api_search)
 
     # Webhook or Polling
-    if config.RAILWAY_PUBLIC_DOMAIN:
+    if config.PUBLIC_DOMAIN:
         webhook_requests_handler = SimpleRequestHandler(
             dispatcher=dp,
             bot=bot,
