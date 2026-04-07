@@ -164,6 +164,9 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "postprocessor_args": {
             "ffmpeg": ["-threads", "0", "-preset", "veryfast"]
         },
+        "nocheckcertificate": True,
+        "no_cache_dir": True,
+        "geo_bypass": True,
     }
 
     if cookie_path:
@@ -460,7 +463,17 @@ async def download_media(url: str, chat_id: int, audio_only: bool = True):
 
     loop = asyncio.get_event_loop()
     async with _download_sem:
-        info, final_path = await loop.run_in_executor(None, _download)
+        try:
+            # Global timeout for download process (60 seconds max)
+            info, final_path = await asyncio.wait_for(
+                loop.run_in_executor(None, _download), 
+                timeout=60.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Download timeout for {url}")
+            raise Exception("⏱ Musiqa yuklash vaqti tugadi. YouTube juda sekin ishlayapti yoki video juda katta.")
+        except Exception as e:
+            raise e
 
     # Backup: boshqa kengaytmalarni tekshirish
     if not os.path.exists(final_path):
