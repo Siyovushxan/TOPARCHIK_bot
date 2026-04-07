@@ -1,7 +1,8 @@
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/bin:${PATH}"
 
 RUN apt-get -o Acquire::Retries=5 update && apt-get install -y --no-install-recommends \
     ffmpeg \

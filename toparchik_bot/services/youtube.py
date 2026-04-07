@@ -77,7 +77,7 @@ def build_youtube_profile() -> dict:
     ios va android clientlari serverlarda bloklanish ehtimoli ancha past.
     """
     youtube_args: dict = {
-        "player_client": ["web", "android_music", "ios", "android", "mweb", "tv_embedded"],
+        "player_client": ["ios", "android", "android_music", "mweb", "web", "tv_embedded"],
         "include_dash_manifest": True,
         "include_hls_manifest": True,
     }
@@ -296,7 +296,16 @@ async def search_youtube(query: str, max_results: int = 10):
             return _search_yt_dlp_sync(query, max_results)
 
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _search_api)
+    try:
+        # Search timeout (15.0 seconds max)
+        return await asyncio.wait_for(loop.run_in_executor(None, _search_api), timeout=15.0)
+    except asyncio.TimeoutError:
+        logger.warning(f"YouTube search timeout for: {query}")
+        # Final fallback: only use archive results (already handled in media.py)
+        return []
+    except Exception as e:
+        logger.error(f"Search unexpected error: {e}")
+        return []
 
 
 def _search_yt_dlp_sync(query: str, max_results: int = 10):
@@ -308,6 +317,7 @@ def _search_yt_dlp_sync(query: str, max_results: int = 10):
         "default_search": f"ytsearch{max_results}",
         "noplaylist": True,
         "no_warnings": True,
+        "nocheckcertificate": True,
         "extractor_args": build_youtube_profile().get("extractor_args", {}),
     }
     if YTDLP_PROXY:

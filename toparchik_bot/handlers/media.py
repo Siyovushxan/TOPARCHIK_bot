@@ -178,6 +178,7 @@ async def handle_media_and_search(message: types.Message):
     # 2. Search logic (Archive first, then YouTube)
     results = archive_service.search_cache(text)
     if len(results) < 10:
+        search_msg = await message.answer("🔍 YouTube dan qidirilmoqda...")
         try:
             yt_results = await search_youtube(text, max_results=10)
             asyncio.create_task(archive_all_results_task(yt_results, message.bot))
@@ -188,6 +189,10 @@ async def handle_media_and_search(message: types.Message):
                     seen_ids.add(yt_res['id'])
         except Exception as e:
             logger.error(f"YouTube Search failed: {e}")
+        finally:
+            try:
+                await search_msg.delete()
+            except: pass
 
     if results:
         def format_duration(seconds):
