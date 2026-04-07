@@ -9,6 +9,7 @@ env:
   PROJECT_ID: toparchik
   SERVICE_NAME: toparchik-bot
   REGION: us-central1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy-bot:
@@ -41,12 +42,13 @@ jobs:
             YOUTUBE_COOKIES=${{ secrets.YOUTUBE_COOKIES }}
             ARCHIVE_CHANNEL=${{ secrets.ARCHIVE_CHANNEL }}
             ADMIN_IDS=${{ secrets.ADMIN_IDS }}
-            FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true
 
   deploy-hosting:
     name: Deploy Web App to Firebase Hosting
     runs-on: ubuntu-latest
     needs: deploy-bot
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
