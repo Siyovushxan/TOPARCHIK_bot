@@ -15,6 +15,13 @@
         }
       },
       {
+        "source": "/webhook",
+        "run": {
+          "serviceId": "toparchik-bot",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
