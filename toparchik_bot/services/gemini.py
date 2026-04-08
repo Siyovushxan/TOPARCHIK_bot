@@ -6,10 +6,9 @@ from toparchik_bot.config import GEMINI_API_KEY
 
 # Models ordered from highest-quota/cheapest to lowest-quota.
 GEMINI_MODELS = (
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite-preview-02-05",
     "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
+    "gemini-1.5-pro",
+    "gemini-pro",
 )
 
 _GEMINI_DAILY_EXHAUSTED = {}  # model_name -> reset_timestamp
@@ -58,6 +57,10 @@ async def ask_gemini(prompt: str) -> str:
             if response and response.text:
                 return response.text
         except Exception as exc:
+            # Filter specifically for 404 NOT_FOUND to log it clearly
+            if "404" in str(exc) or "not found" in str(exc).lower():
+                print(f"Gemini model {model_name} not available: {exc}")
+                continue
             if "api key" in str(exc).lower():
                 GEMINI_KEY_INVALID = True
                 return "Gemini API key yaroqsiz."
