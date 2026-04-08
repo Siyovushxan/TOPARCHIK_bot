@@ -129,6 +129,7 @@ async def handle_media_and_search(message: types.Message):
             await message.answer(f"Juda tez so'rov yuboryapsiz. {wait_for:.1f} soniya kuting.")
             return
         
+        await message.bot.send_chat_action(message.chat.id, "record_voice")
         wait_msg = await message.answer("⏳ Media yuklab olinmoqda...")
         try:
             info, file_path = await download_media(text, message.chat.id)
@@ -178,6 +179,7 @@ async def handle_media_and_search(message: types.Message):
     # 2. Search logic (Archive first, then YouTube)
     results = archive_service.search_cache(text)
     if len(results) < 10:
+        await message.bot.send_chat_action(message.chat.id, "typing")
         search_msg = await message.answer("🔍 YouTube dan qidirilmoqda...")
         try:
             yt_results = await search_youtube(text, max_results=10)
@@ -230,6 +232,7 @@ async def process_download(callback: types.CallbackQuery):
         await callback.answer(f"Juda tez so'rov. {wait_for:.1f}s kuting.", show_alert=True)
         return
     
+    await callback.bot.send_chat_action(callback.message.chat.id, "record_voice")
     wait_msg = await callback.message.answer("⏳ Audio yuklab olinmoqda...")
     await callback.answer()
 
