@@ -2,6 +2,7 @@ import asyncio
 import signal
 import logging
 import os
+import sys
 from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -9,12 +10,22 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from toparchik_bot import config
 from toparchik_bot.handlers import common, media, docs, admin, webapp as webapp_handlers
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
+# Logging setup — structured format with timestamp
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 logger = logging.getLogger(__name__)
+
+# Startup validation
+if not config.BOT_TOKEN:
+    logger.critical("BOT_TOKEN o'rnatilmagan! .env faylini tekshiring.")
+    sys.exit(1)
 
 # Bot initialization
 bot = Bot(token=config.BOT_TOKEN)
+
 dp = Dispatcher()
 
 def setup_routers(dp: Dispatcher):

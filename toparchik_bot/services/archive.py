@@ -181,6 +181,36 @@ class ArchiveService:
             info["total_downloads"] += int(s.get("download_count", 0) or 0)
         return sorted(stats.values(), key=lambda x: -x["total_downloads"])
 
+    def upsert_audio_entry(self, unique_id: str, file_id: str, title: str,
+                           duration: float, artist: str = "", platform: str = "",
+                           message_id: int = 0):
+        """Arxivga yangi qo'shiq qo'shish yoki mavjudini yangilash (admin sync uchun)."""
+        existing_count = 0
+        if USE_FIRESTORE:
+            doc = db.collection(COLLECTION_NAME).document(unique_id).get()
+            if doc.exists:
+                existing_count = doc.to_dict().get("download_count", 0)
+        else:
+            existing = self.cache.get(unique_id)
+            if isinstance(existing, dict):
+                existing_count = existing.get("download_count", 0)
+
+        data = {
+            "file_id": file_id,
+            "title": title,
+            "duration": duration,
+            "artist": artist.strip(),
+            "platform": platform,
+            "download_count": existing_count,
+            "play_count": 0,
+            "message_id": message_id,
+        }
+        if USE_FIRESTORE:
+            db.collection(COLLECTION_NAME).document(unique_id).set(data, merge=True)
+        else:
+            self.cache[unique_id] = data
+            self.save_cache()
+
     def get_songs_by_artist(self, artist: str) -> list:
         if USE_FIRESTORE:
             docs = db.collection(COLLECTION_NAME).where("artist", "==", artist).order_by("download_count", direction=firestore.Query.DESCENDING).stream()

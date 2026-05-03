@@ -170,7 +170,14 @@ async def handle_media_and_search(message: types.Message):
                     logger.error(f"Archive error: {e}")
             
         except Exception as exc:
-            await message.answer(f"❌ Media yuklashda xato: {exc}", disable_web_page_preview=True)
+            logger.error(f"Media download error: {exc}")
+            await message.answer(
+                f"❌ <b>Media yuklashda xato yuz berdi.</b>\n\n"
+                f"<i>{exc}</i>\n\n"
+                "💡 Boshqa link yuboring yoki qo'shiq nomini yozing.",
+                parse_mode="HTML",
+                disable_web_page_preview=True
+            )
         finally:
             if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
             await wait_msg.delete()
@@ -264,7 +271,12 @@ async def process_download(callback: types.CallbackQuery):
                 archive_service.cache_file_info(video_id, archive_msg.audio.file_id, info.get('title', ''), info.get('duration', 0), parse_artist_from_title(info.get('title', '')), platform="youtube")
             except: pass
     except Exception as exc:
-        await callback.message.answer(f"❌ Xato: {exc}")
+        logger.error(f"Download callback error: {exc}")
+        await callback.message.answer(
+            f"❌ <b>Yuklashda xato:</b>\n<i>{exc}</i>\n\n"
+            "💡 Boshqa qo'shiq tanlang yoki nom bilan qidiring.",
+            parse_mode="HTML"
+        )
     finally:
         if 'file_path' in locals() and os.path.exists(file_path): os.remove(file_path)
         await wait_msg.delete()
@@ -276,7 +288,9 @@ async def nav_close(callback: types.CallbackQuery):
 
 @router.callback_query(F.data.startswith("artist_sel_"))
 async def artist_selected(callback: types.CallbackQuery):
-    artist = unquote_plus(callback.data.split("_", 1)[1])
+    # artist_sel_ prefix ni to'g'ri olib tashlash (split emas, removeprefix)
+    raw = callback.data.removeprefix("artist_sel_")
+    artist = unquote_plus(raw)
     songs = archive_service.get_songs_by_artist(artist)
     response_text = f"<b>🎶 {artist} qo'shiqlari:</b>\n\n"
     

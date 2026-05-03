@@ -146,7 +146,7 @@ def _parse_iso8601_duration(duration: str) -> int:
 def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
     """yt-dlp uchun minimal va tezkor parametrlar."""
     cookie_path = get_cookies_path()
-    
+
     opts = {
         "outtmpl": outtmpl,
         "quiet": False,
@@ -168,6 +168,11 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         "no_cache_dir": True,
         "geo_bypass": True,
     }
+
+    # PO Token, Visitor Data va extractor_args ni qo'shish
+    youtube_profile = build_youtube_profile()
+    if youtube_profile:
+        opts.update(youtube_profile)
 
     if cookie_path:
         opts["cookiefile"] = cookie_path
@@ -191,6 +196,7 @@ def get_yt_dlp_opts(outtmpl: str, audio_only: bool = True) -> dict:
         })
 
     return opts
+
 
 
 async def compress_audio(input_path: str, target_size_mb: int = 49):

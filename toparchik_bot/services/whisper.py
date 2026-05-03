@@ -1,6 +1,10 @@
 import aiohttp
 import asyncio
-from config import HF_TOKEN
+import logging
+from toparchik_bot.config import HF_TOKEN
+
+logger = logging.getLogger(__name__)
+
 
 API_URLS = [
     "https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3-turbo",

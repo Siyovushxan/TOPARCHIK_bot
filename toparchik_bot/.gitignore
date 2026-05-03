@@ -2,8 +2,15 @@
 __pycache__/
 downloads/
 *.pyc
+*.pyo
 user_searches.json
 user_searches.json.bak
+cache_index.json
 .gemini/
 venv/
+.venv/
 .vscode/
+*.log
+*.txt.bak
+youtube_cookies.txt
+yt_cookies.txt
